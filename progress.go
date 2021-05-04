@@ -19,7 +19,7 @@ type ProgressBar struct {
 	mutex         *sync.Mutex
 }
 
-func (_ ProgressBar) New(description string, totalSteps int64) ProgressBar {
+func (ProgressBar) New(description string, totalSteps int64) ProgressBar {
 	bar := ProgressBar{
 		description: description,
 		total:       totalSteps,

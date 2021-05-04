@@ -1,6 +1,6 @@
 package my
 
-type OrderedMap struct { // TODO: remove
+type OrderedMap struct {
 	keys    []interface{}
 	values  []interface{}
 	indices map[interface{}]int
@@ -9,7 +9,7 @@ type OrderedMapPair struct {
 	key   interface{}
 	value interface{}
 }
-func NewOrderedMap() OrderedMap {
+func (OrderedMap) New() OrderedMap {
 	return OrderedMap{
 		keys:    make([]interface{}, 0),
 		values:  make([]interface{}, 0),
