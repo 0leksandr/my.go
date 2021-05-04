@@ -42,17 +42,22 @@ func (bar *ProgressBar) UpdateTotal(total int64) {
 	bar.total = total
 	bar.updated()
 }
+func (bar ProgressBar) FmtDuration(duration time.Duration) string {
+	return regexp.
+		MustCompile("^([^.]+\\.\\d{2})\\d*([^0-9]+)$").
+		ReplaceAllString(duration.String(), "$1$2")
+}
 func (bar *ProgressBar) updated() {
 	nrNotches := bar.nrNotches()
 
 	if bar.current >= bar.total {
-		bar.print(bar.fmtDuration(time.Since(bar.start)), true)
+		bar.print(bar.FmtDuration(time.Since(bar.start)), true)
 	} else if (nrNotches > bar.prevNrNotches) || (time.Since(bar.lastPrint) > 5 * time.Second) {
 		bar.print(
 			fmt.Sprintf(
 				"%d%% ≈%s",
 				bar.current * 100 / bar.total,
-				bar.fmtDuration(bar.estimateLeft()),
+				bar.FmtDuration(bar.estimateLeft()),
 			),
 			false,
 		)
@@ -89,11 +94,6 @@ func (bar ProgressBar) estimateLeft() time.Duration {
 	return time.Duration(
 		float64(time.Since(bar.start).Nanoseconds()) * float64(bar.total - bar.current) / float64(bar.current),
 	)
-}
-func (bar ProgressBar) fmtDuration(duration time.Duration) string {
-	return regexp.
-		MustCompile("^([^.]+\\.\\d{2})\\d*([^0-9]+)$").
-		ReplaceAllString(duration.String(), "$1$2")
 }
 func testProgress() {
 	for _, nrSteps := range []int64{1, 3, 10, 11, 30, 100, 300, 999, 1000, 1001} {
