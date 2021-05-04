@@ -19,7 +19,7 @@ type ProgressBar struct {
 	mutex         *sync.Mutex
 }
 
-func NewProgressBar(description string, totalSteps int64) ProgressBar {
+func (_ ProgressBar) New(description string, totalSteps int64) ProgressBar {
 	bar := ProgressBar{
 		description: description,
 		total:       totalSteps,
@@ -98,7 +98,7 @@ func (bar ProgressBar) estimateLeft() time.Duration {
 func testProgress() {
 	for _, nrSteps := range []int64{1, 3, 10, 11, 30, 100, 300, 999, 1000, 1001} {
 		sleep := int64(1 * time.Second) / nrSteps
-		progress := NewProgressBar(fmt.Sprintf("Test %4d", nrSteps), nrSteps)
+		progress := ProgressBar{}.New(fmt.Sprintf("Test %4d", nrSteps), nrSteps)
 		for c := int64(0); c < nrSteps; c++ {
 			time.Sleep(time.Duration(sleep))
 			progress.Add()
