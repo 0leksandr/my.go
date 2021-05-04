@@ -6,8 +6,8 @@ type OrderedMap struct {
 	indices map[interface{}]int
 }
 type OrderedMapPair struct {
-	key   interface{}
-	value interface{}
+	Key   interface{}
+	Value interface{}
 }
 func (OrderedMap) New() OrderedMap {
 	return OrderedMap{
@@ -50,8 +50,8 @@ func (m OrderedMap) Pairs() []OrderedMapPair {
 		pairs = append(
 			pairs,
 			OrderedMapPair{
-				key:   key,
-				value: m.values[index],
+				Key:   key,
+				Value: m.values[index],
 			},
 		)
 	}
