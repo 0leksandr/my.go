@@ -16,7 +16,7 @@ func (OrderedMap) New() OrderedMap {
 		indices: make(map[interface{}]int),
 	}
 }
-func (m *OrderedMap) Set(key interface{}, value interface{}) {
+func (m *OrderedMap) Set(key interface{}, value interface{}) *OrderedMap {
 	if index, ok := m.indices[key]; ok {
 		m.values[index] = value
 	} else {
@@ -24,6 +24,8 @@ func (m *OrderedMap) Set(key interface{}, value interface{}) {
 		m.values = append(m.values, value)
 		m.indices[key] = m.Len() - 1
 	}
+
+	return m
 }
 func (m OrderedMap) Len() int {
 	return len(m.keys)

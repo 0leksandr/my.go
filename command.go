@@ -11,25 +11,25 @@ func RunCommand(dir string, cmd string, onStdout func(string), onStderr func(str
 	command := exec.Command("sh", "-c", cmd)
 	command.Dir = dir
 
-	stdout, err := command.StdoutPipe()
-	PanicIf(err)
-	stdoutScanner := bufio.NewScanner(stdout)
-	go func() {
-		for stdoutScanner.Scan() {
-			stdout := stdoutScanner.Text()
-			if onStdout != nil { onStdout(stdout) }
-		}
-	}()
+	if onStdout != nil {
+		stdout, err := command.StdoutPipe()
+		PanicIf(err)
+		defer func() { Must(stdout.Close()) }()
+		stdoutScanner := bufio.NewScanner(stdout)
+		go func() {
+			for stdoutScanner.Scan() { onStdout(stdoutScanner.Text()) }
+		}()
+	}
 
-	stderr, err := command.StderrPipe()
-	PanicIf(err)
-	stderrScanner := bufio.NewScanner(stderr)
-	go func() {
-		for stderrScanner.Scan() {
-			stderr := stderrScanner.Text()
-			if onStderr != nil { onStderr(stderr) }
-		}
-	}()
+	if onStderr != nil {
+		stderr, err := command.StderrPipe()
+		PanicIf(err)
+		defer func() { Must(stderr.Close()) }()
+		stderrScanner := bufio.NewScanner(stderr)
+		go func() {
+			for stderrScanner.Scan() { onStderr(stderrScanner.Text()) }
+		}()
+	}
 
 	return command.Run() == nil
 }
