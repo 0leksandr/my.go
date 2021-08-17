@@ -14,7 +14,7 @@ func RunCommand(dir string, cmd string, onStdout func(string), onStderr func(str
 	if onStdout != nil {
 		stdout, err := command.StdoutPipe()
 		PanicIf(err)
-		defer func() { Must(stdout.Close()) }()
+		//defer func() { Must(stdout.Close()) }()
 		stdoutScanner := bufio.NewScanner(stdout)
 		go func() {
 			for stdoutScanner.Scan() { onStdout(stdoutScanner.Text()) }
@@ -24,7 +24,9 @@ func RunCommand(dir string, cmd string, onStdout func(string), onStderr func(str
 	if onStderr != nil {
 		stderr, err := command.StderrPipe()
 		PanicIf(err)
-		defer func() { Must(stderr.Close()) }()
+		// &fs.PathError{Op:"close", Path:"|0", Err:(*errors.errorString)(0xc0001121c0)}
+		// close |0: file already closed
+		//defer func() { Must(stderr.Close()) }()
 		stderrScanner := bufio.NewScanner(stderr)
 		go func() {
 			for stderrScanner.Scan() { onStderr(stderrScanner.Text()) }
