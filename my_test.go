@@ -36,3 +36,8 @@ func TestRemove(t *testing.T) {
 	slice = Remove(slice, 0).([]int)
 	if !reflect.DeepEqual(slice, []int{}) { t.Error(slice) }
 }
+func TestInArray(t *testing.T) {
+	if !InArray(3, []int{1, 2, 3}) { t.Error() }
+	if InArray("3", []string{"1", "2"}) { t.Error() }
+	//InArray("1", []int{1, 2, 3})
+}
