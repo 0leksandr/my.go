@@ -1,12 +1,15 @@
 package my
 
-func PanicIf(err error) {
+func panicIf(err error) {
 	if err != nil {
-		Dump(err)
+		dumpAt(2, err)
 		//log.Fatal(err)
 		panic(err)
 	}
 }
+func PanicIf(err error) {
+	panicIf(err)
+}
 func Must(err error) {
-	PanicIf(err)
+	panicIf(err)
 }
