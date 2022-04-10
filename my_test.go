@@ -2,12 +2,23 @@ package my
 
 import (
 	"errors"
+	"os"
 	"reflect"
 	"testing"
 )
 
 func TestDump(t *testing.T) {
 	Dump("hi")
+}
+func TestTrace(t *testing.T) {
+	currentDir, err := os.Getwd()
+	PanicIf(err)
+	expected := []string{currentDir + "/my_test.go:17"}
+	actual := Trace(false)
+	if !reflect.DeepEqual(expected, actual) { t.Error(actual) }
+
+	fullTrace := Trace(true)
+	if len(fullTrace) != 3 { t.Error(fullTrace) }
 }
 func TestPanicIf(t *testing.T) {
 	if false {
