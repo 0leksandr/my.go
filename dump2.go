@@ -7,39 +7,42 @@ import (
 	"strings"
 )
 
-func Dump2(values ...interface{}) {
+func Sdump2(value interface{}) string {
 	spew.Config.DisableCapacities = true
 	spew.Config.Indent = "    "
 
-	for _, val := range values {
-		str := spew.Sdump(val)
-		lines := strings.Split(str, "\n")
-		for lineNr, line := range lines {
-			type Replacement struct {
-				re *regexp.Regexp
-				to string
-			}
-			for _, replacement := range []Replacement{
-				{ // opening bracket
-					regexp.MustCompile("^( *(?:\\w+: )?)\\((\\[])?(?:main\\.)?([^)]+)\\)(?: \\(len=\\d+\\))? {$"),
-					"$1$2$3{",
-				},
-				{ // simple value
-					regexp.MustCompile("^( *\\w+: )\\([\\w.]+\\) (.*[^,]),?$"),
-					"$1$2,",
-				},
-				{ // closing bracket
-					regexp.MustCompile("^( +})$"),
-					"$1,",
-				},
-			} {
-				if replacement.re.MatchString(line) {
-					line = replacement.re.ReplaceAllString(line, replacement.to)
-				}
-			}
-			lines[lineNr] = line
+	str := spew.Sdump(value)
+	lines := strings.Split(str, "\n")
+	if len(lines) > 1 { lines = lines[:len(lines)-1] }
+	for lineNr, line := range lines {
+		type Replacement struct {
+			re *regexp.Regexp
+			to string
 		}
-		fmt.Printf("%v\n", fileLine(1))
-		for _, line := range lines { fmt.Println(line) }
+		for _, replacement := range []Replacement{
+			{ // opening bracket
+				regexp.MustCompile("^( *(?:\\w+: )?)\\((\\[])?(?:main\\.)?([^)]+)\\)(?: \\(len=\\d+\\))? {$"),
+				"$1$2$3{",
+			},
+			{ // simple value
+				regexp.MustCompile("^( *\\w+: )\\([\\w.]+\\) (.*[^,]),?$"),
+				"$1$2,",
+			},
+			{ // closing bracket
+				regexp.MustCompile("^( +})$"),
+				"$1,",
+			},
+		} {
+			if replacement.re.MatchString(line) {
+				line = replacement.re.ReplaceAllString(line, replacement.to)
+			}
+		}
+		lines[lineNr] = line
+	}
+	return strings.Join(lines, "\n")
+}
+func Dump2(values ...interface{}) {
+	for _, value := range values {
+		fmt.Printf("%v\n%s\n", fileLine(1), Sdump2(value))
 	}
 }

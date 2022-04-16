@@ -20,6 +20,38 @@ func TestTrace(t *testing.T) {
 	fullTrace := Trace(true)
 	if len(fullTrace) != 3 { t.Error(fullTrace) }
 }
+func TestSdump2(t *testing.T) {
+	expected :=
+`struct { int int; string string; sliceFloat []float32; mapStringInt map[string]int }{
+    int: 42,
+    string: (len=4) "test",
+    sliceFloat: []float32{
+        (float32) 1.2,
+        (float32) 3.4
+    },
+    mapStringInt: map[string]int{
+        (string) (len=4) "key1": (int) 1,
+        (string) (len=4) "key2": (int) 2
+    },
+}`
+	actual := Sdump2(struct {
+		int          int
+		string       string
+		sliceFloat   []float32
+		mapStringInt map[string]int
+	}{
+		int:        42,
+		string:     "test",
+		sliceFloat: []float32{1.2, 3.4},
+		mapStringInt: map[string]int{
+			"key1": 1,
+			"key2": 2,
+		},
+	})
+	if actual != expected {
+		t.Error(actual)
+	}
+}
 func TestPanicIf(t *testing.T) {
 	if false {
 		PanicIf(errors.New("test"))
