@@ -1,0 +1,35 @@
+name: Run tests
+
+on:
+  push:
+    branches: [ master ]
+
+jobs:
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+
+    - uses: arnested/go-version-action@v1
+      id: go-version
+
+    - name: Set up Go ${{ steps.go-version.outputs.minimal }}
+      uses: actions/setup-go@v3
+      with:
+        go-version: ${{ steps.go-version.outputs.minimal }}
+
+    - uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cache/go-build
+          ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-
+
+    - name: Build
+      run: go build -v ./...
+
+    - name: Test
+      run: go test -v ./...
