@@ -13,7 +13,7 @@ func TestDump(t *testing.T) {
 func TestTrace(t *testing.T) {
 	currentDir, err := os.Getwd()
 	PanicIf(err)
-	expected := []string{currentDir + "/my_test.go:17"}
+	expected := Frames{{currentDir + "/my_test.go", 17}}
 	actual := Trace(false)
 	if !reflect.DeepEqual(expected, actual) { t.Error(actual) }
 
@@ -83,4 +83,43 @@ func TestInArray(t *testing.T) {
 	if !InArray(3, []int{1, 2, 3}) { t.Error() }
 	if InArray("3", []string{"1", "2"}) { t.Error() }
 	//InArray("1", []int{1, 2, 3})
+}
+func TestDummyMap(t *testing.T) {
+	assert := func(condition bool) {
+		if !condition {
+			Dump(Trace(false)[1])
+			t.Fail()
+		}
+	}
+
+	m := DummyMap{}
+	assert(!m.Has("test"))
+	assert(m.Len() == 0)
+	if _, ok := m.Get("test"); ok { t.Fail() }
+	assert(reflect.DeepEqual(
+		m.Arr(reflect.TypeOf([]string{})),
+		[]string{},
+	))
+
+	m.Set("test", "a test")
+	assert(m.Has("test"))
+	assert(m.Len() == 1)
+	(func() {
+		value, ok := m.Get("test")
+		assert(reflect.DeepEqual(value, "a test"))
+		assert(ok == true)
+	})()
+	assert(reflect.DeepEqual(
+		m.Arr(reflect.TypeOf([]string{})),
+		[]string{"a test"},
+	))
+
+	m.Del("test")
+	assert(!m.Has("test"))
+	assert(m.Len() == 0)
+	if _, ok := m.Get("test"); ok { t.Fail() }
+	assert(reflect.DeepEqual(
+		m.Arr(reflect.TypeOf([]string{})),
+		[]string{},
+	))
 }
