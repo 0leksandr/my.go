@@ -88,7 +88,7 @@ func TestDummyMap(t *testing.T) {
 	assert := func(condition bool) {
 		if !condition {
 			Dump(Trace(false)[1])
-			t.Fail()
+			t.Error()
 		}
 	}
 
@@ -122,4 +122,16 @@ func TestDummyMap(t *testing.T) {
 		m.Arr(reflect.TypeOf([]string{})),
 		[]string{},
 	))
+}
+func TestTypes(t *testing.T) {
+	types := Types(false)
+	if !reflect.DeepEqual(
+		types,
+		[]reflect.Type{ // PRIORITY: fix
+			reflect.TypeOf(Frame{}),
+			reflect.TypeOf(Frames{}),
+		},
+	) {
+		t.Error(types)
+	}
 }

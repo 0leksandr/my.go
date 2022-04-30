@@ -1,0 +1,20 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - 'master'
+    tags:
+      - '*'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3  # MAYBE: remove
+      - name: Get tag
+        id: get_tag
+        run: echo ::set-output name=tag::${GITHUB_REF/refs\/tags\//}
+      - uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ steps.get_tag.outputs.tag }}
