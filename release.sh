@@ -2,7 +2,7 @@
 set -e
 tag="$1"
 
-last_tag="$(git describe --tags)"
+last_tag="$(git describe --abbrev=0 --tags)"
 if [ "$last_tag" = "$(echo "$last_tag\n$tag" |sort --version-sort |tail -n1)" ]; then
   echo>&2 "last tag: $last_tag"
   exit 1
@@ -13,5 +13,5 @@ if ! echo "$tag" |grep -Eq "v([0-9]+\.){2}[0-9]+$"; then
   exit 1
 fi
 
-git tag "$tag"
+git tag "$tag"  # MAYBE: use annotated tags
 git push origin "$tag"
