@@ -13,16 +13,29 @@ func TestDump(t *testing.T) {
 func TestTrace(t *testing.T) {
 	currentDir, err := os.Getwd()
 	PanicIf(err)
-	expected := Frames{{currentDir + "/my_test.go", 17}}
-	actual := Trace(false)
-	if !reflect.DeepEqual(expected, actual) { t.Error(actual) }
+	assertEquals(t, Trace(false), Frames{{currentDir + "/my_test.go", 16}})
 
 	fullTrace := Trace(true)
-	if len(fullTrace) != 3 { t.Error(fullTrace) }
+	assert(t, len(fullTrace) == 3, fullTrace)
 }
 func TestSdump2(t *testing.T) {
-	expected :=
-`struct { int int; string string; sliceFloat []float32; mapStringInt map[string]int }{
+	assertEquals(
+		t,
+		Sdump2(struct {
+			int          int
+			string       string
+			sliceFloat   []float32
+			mapStringInt map[string]int
+		}{
+			int:        42,
+			string:     "test",
+			sliceFloat: []float32{1.2, 3.4},
+			mapStringInt: map[string]int{
+				"key1": 1,
+				"key2": 2,
+			},
+		}),
+		`struct { int int; string string; sliceFloat []float32; mapStringInt map[string]int }{
     int: 42,
     string: (len=4) "test",
     sliceFloat: []float32{
@@ -33,24 +46,8 @@ func TestSdump2(t *testing.T) {
         (string) (len=4) "key1": (int) 1,
         (string) (len=4) "key2": (int) 2
     },
-}`
-	actual := Sdump2(struct {
-		int          int
-		string       string
-		sliceFloat   []float32
-		mapStringInt map[string]int
-	}{
-		int:        42,
-		string:     "test",
-		sliceFloat: []float32{1.2, 3.4},
-		mapStringInt: map[string]int{
-			"key1": 1,
-			"key2": 2,
-		},
-	})
-	if actual != expected {
-		t.Error(actual)
-	}
+}`,
+	)
 }
 func TestPanicIf(t *testing.T) {
 	if false {
@@ -61,118 +58,110 @@ func TestPanicIf(t *testing.T) {
 	}
 }
 func TestRevert(t *testing.T) {
-	slice := []int{1, 2, 3, 4}
-	expected := []int{4, 3, 2, 1}
-	actual := Revert(slice).([]int)
-	if !reflect.DeepEqual(actual, expected) {
-		t.Error(expected, actual)
-	}
+	assertEquals(t, Revert([]int{1, 2, 3, 4}).([]int), []int{4, 3, 2, 1})
 }
 func TestRemove(t *testing.T) {
 	slice := []int{1, 2, 3, 4}
 	slice = Remove(slice, 2).([]int)
-	if !reflect.DeepEqual(slice, []int{1, 2, 4}) { t.Error(slice) }
+	assertEquals(t, slice, []int{1, 2, 4})
 	slice = Remove(slice, 2).([]int)
-	if !reflect.DeepEqual(slice, []int{1, 2}) { t.Error(slice) }
+	assertEquals(t, slice, []int{1, 2})
 	slice = Remove(slice, 0).([]int)
-	if !reflect.DeepEqual(slice, []int{2}) { t.Error(slice) }
+	assertEquals(t, slice, []int{2})
 	slice = Remove(slice, 0).([]int)
-	if !reflect.DeepEqual(slice, []int{}) { t.Error(slice) }
+	assertEquals(t, slice, []int{})
 }
 func TestInArray(t *testing.T) {
-	if !InArray(3, []int{1, 2, 3}) { t.Error() }
-	if InArray("3", []string{"1", "2"}) { t.Error() }
+	assert(t, InArray(3, []int{1, 2, 3}))
+	assert(t, !InArray("3", []string{"1", "2"}))
 	//InArray("1", []int{1, 2, 3})
 }
 func TestDummyMap(t *testing.T) {
-	assert := func(condition bool) {
-		if !condition {
-			Dump(Trace(false)[1])
-			t.Error()
-		}
-	}
-
 	m := DummyMap{}
-	assert(!m.Has("test"))
-	assert(m.Len() == 0)
+	assert(t, !m.Has("test"))
+	assert(t, m.Len() == 0)
 	if _, ok := m.Get("test"); ok { t.Fail() }
-	assert(reflect.DeepEqual(
+	assertEquals(
+		t,
 		m.Arr(reflect.TypeOf([]string{})),
 		[]string{},
-	))
+	)
 
 	m.Set("test", "a test")
-	assert(m.Has("test"))
-	assert(m.Len() == 1)
+	assert(t, m.Has("test"))
+	assert(t, m.Len() == 1)
 	(func() {
 		value, ok := m.Get("test")
-		assert(reflect.DeepEqual(value, "a test"))
-		assert(ok == true)
+		assertEquals(t, value, "a test")
+		assert(t, ok)
 	})()
-	assert(reflect.DeepEqual(
+	assertEquals(
+		t,
 		m.Arr(reflect.TypeOf([]string{})),
 		[]string{"a test"},
-	))
+	)
 
 	m.Del("test")
-	assert(!m.Has("test"))
-	assert(m.Len() == 0)
+	assert(t, !m.Has("test"))
+	assert(t, m.Len() == 0)
 	if _, ok := m.Get("test"); ok { t.Fail() }
-	assert(reflect.DeepEqual(
+	assertEquals(
+		t,
 		m.Arr(reflect.TypeOf([]string{})),
 		[]string{},
-	))
+	)
 }
 func TestTypes(t *testing.T) {
-	types := Types(false)
-	if !reflect.DeepEqual(
-		types,
+	assertEquals(
+		t,
+		Types(false),
 		[]reflect.Type{
 			reflect.TypeOf(Frame{}),
 			reflect.TypeOf(Frames{}),
+			reflect.TypeOf(ParsedArrayType{}),
+			reflect.TypeOf(ParsedFunc{}),
 			reflect.TypeOf(ParsedInterface{}),
-			reflect.TypeOf(ParsedMethod{}),
+			reflect.TypeOf(ParsedNamedType{}),
 			reflect.TypeOf(ParsedPackage{}),
 			reflect.TypeOf(ParsedStruct{}),
+			reflect.TypeOf((*ParsedType)(nil)).Elem(),
 		},
-	) {
-		t.Error(types)
-	}
+	)
 }
 func TestParseTypes(t *testing.T) {
 	parsed := ParseTypes()
 	testInterface := parsed.Interfaces["TestInterface"]
 	testType1 := parsed.Structs["TestType1"]
 	testType2 := parsed.Structs["TestType2"]
-	if !reflect.DeepEqual(
+	assertEquals(
+		t,
 		testInterface,
 		ParsedInterface{
-			Methods: map[string]ParsedMethod{
-				"TestMethod": {"func()"},
+			Methods: map[string]ParsedFunc{
+				"TestMethod": {},
 			},
 		},
-	) {
-		t.Error(testInterface)
-	}
-	if !reflect.DeepEqual(
+	)
+	assertEquals(
+		t,
 		testType1,
 		ParsedStruct{
-			Methods: map[string]ParsedMethod{},
+			Methods: map[string]ParsedFunc{},
 		},
-	) {
-		t.Error(testType1)
-	}
-	if !reflect.DeepEqual(
+	)
+	assertEquals(
+		t,
 		testType2,
 		ParsedStruct{
-			Methods: map[string]ParsedMethod{
-				"TestMethod":  {"func()"},
-				"testMethod2": {"func() bool"},
+			Methods: map[string]ParsedFunc{
+				"TestMethod":  {},
+				"testMethod2": {Out: []ParsedType{ParsedNamedType{"bool"}}},
 			},
 		},
-	) {
-		t.Error(testType2)
-	}
+	)
+
+	assert(t, !testType1.Implements(testInterface))
+	assert(t, testType2.Implements(testInterface))
 }
 
 type TestInterface interface { TestMethod() }
