@@ -54,8 +54,7 @@ func ParseTypes() ParsedPackage {
 		for _, astFile := range astPkg.Files {
 			files = append(files, astFile)
 		}
-		typesPkg, errCheck := conf.Check(dir, fset, files, nil)
-		PanicIf(errCheck)
+		typesPkg, _ := conf.Check(dir, fset, files, nil)
 		scope := typesPkg.Scope()
 		for _, name := range scope.Names() {
 			obj := scope.Lookup(name)
