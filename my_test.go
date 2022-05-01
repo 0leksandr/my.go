@@ -127,11 +127,58 @@ func TestTypes(t *testing.T) {
 	types := Types(false)
 	if !reflect.DeepEqual(
 		types,
-		[]reflect.Type{ // PRIORITY: fix
+		[]reflect.Type{
 			reflect.TypeOf(Frame{}),
 			reflect.TypeOf(Frames{}),
+			reflect.TypeOf(ParsedInterface{}),
+			reflect.TypeOf(ParsedMethod{}),
+			reflect.TypeOf(ParsedPackage{}),
+			reflect.TypeOf(ParsedStruct{}),
 		},
 	) {
 		t.Error(types)
 	}
 }
+func TestParseTypes(t *testing.T) {
+	parsed := ParseTypes()
+	testInterface := parsed.Interfaces["TestInterface"]
+	testType1 := parsed.Structs["TestType1"]
+	testType2 := parsed.Structs["TestType2"]
+	if !reflect.DeepEqual(
+		testInterface,
+		ParsedInterface{
+			Methods: map[string]ParsedMethod{
+				"TestMethod": {"func()"},
+			},
+		},
+	) {
+		t.Error(testInterface)
+	}
+	if !reflect.DeepEqual(
+		testType1,
+		ParsedStruct{
+			Methods: map[string]ParsedMethod{},
+		},
+	) {
+		t.Error(testType1)
+	}
+	if !reflect.DeepEqual(
+		testType2,
+		ParsedStruct{
+			Methods: map[string]ParsedMethod{
+				"TestMethod":  {"func()"},
+				"testMethod2": {"func() bool"},
+			},
+		},
+	) {
+		t.Error(testType2)
+	}
+}
+
+type TestInterface interface { TestMethod() }
+//goland:noinspection GoUnusedExportedType
+type TestType1 struct { TestInterface }
+//goland:noinspection GoUnusedExportedType
+type TestType2 struct { TestInterface }
+func (t TestType2) TestMethod() {}
+func (t TestType2) testMethod2() bool { return true }
