@@ -2,6 +2,7 @@ package my
 
 import (
 	"fmt"
+	"os"
 	"regexp"
 	"runtime"
 )
@@ -42,13 +43,17 @@ func Trace(full bool) Frames {
 		})
 	}
 	frame, more := frames.Next()
-	projectRoot := regexp.MustCompile("^(.+/)[^/]+$").FindStringSubmatch(frame.File)[1]
+	if !more { panic("weird frames") }
+	var projectRootRe *regexp.Regexp
+	if !full {
+		ps := string(os.PathSeparator)
+		projectRoot := regexp.MustCompile(fmt.Sprintf("^(.+%s)[^%s]+$", ps, ps)).FindStringSubmatch(frame.File)[1]
+		projectRootRe = regexp.MustCompile(fmt.Sprintf("^%s[^%s]+$", projectRoot, ps))
+	}
 	add(frame)
 	for more {
 		frame, more = frames.Next()
-		if full || regexp.MustCompile(fmt.Sprintf("^%s[^/]+$", projectRoot)).MatchString(frame.File) {
-			add(frame)
-		}
+		if projectRootRe == nil || projectRootRe.MatchString(frame.File) { add(frame) }
 	}
 	return trace
 }

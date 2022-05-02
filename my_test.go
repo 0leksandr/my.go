@@ -13,13 +13,13 @@ func TestDump(t *testing.T) {
 func TestTrace(t *testing.T) {
 	currentDir, err := os.Getwd()
 	PanicIf(err)
-	assertEquals(t, Trace(false), Frames{{currentDir + "/my_test.go", 16}})
+	AssertEquals(t, Trace(false), Frames{{currentDir + "/my_test.go", 16}})
 
 	fullTrace := Trace(true)
-	assert(t, len(fullTrace) == 3, fullTrace)
+	Assert(t, len(fullTrace) == 3, fullTrace)
 }
 func TestSdump2(t *testing.T) {
-	assertEquals(
+	AssertEquals(
 		t,
 		Sdump2(struct {
 			int          int
@@ -58,69 +58,72 @@ func TestPanicIf(t *testing.T) {
 	}
 }
 func TestRevert(t *testing.T) {
-	assertEquals(t, Revert([]int{1, 2, 3, 4}).([]int), []int{4, 3, 2, 1})
+	AssertEquals(t, Revert([]int{1, 2, 3, 4}).([]int), []int{4, 3, 2, 1})
 }
 func TestRemove(t *testing.T) {
 	slice := []int{1, 2, 3, 4}
 	slice = Remove(slice, 2).([]int)
-	assertEquals(t, slice, []int{1, 2, 4})
+	AssertEquals(t, slice, []int{1, 2, 4})
 	slice = Remove(slice, 2).([]int)
-	assertEquals(t, slice, []int{1, 2})
+	AssertEquals(t, slice, []int{1, 2})
 	slice = Remove(slice, 0).([]int)
-	assertEquals(t, slice, []int{2})
+	AssertEquals(t, slice, []int{2})
 	slice = Remove(slice, 0).([]int)
-	assertEquals(t, slice, []int{})
+	AssertEquals(t, slice, []int{})
 }
 func TestInArray(t *testing.T) {
-	assert(t, InArray(3, []int{1, 2, 3}))
-	assert(t, !InArray("3", []string{"1", "2"}))
+	Assert(t, InArray(3, []int{1, 2, 3}))
+	Assert(t, !InArray("3", []string{"1", "2"}))
 	//InArray("1", []int{1, 2, 3})
 }
 func TestDummyMap(t *testing.T) {
 	m := DummyMap{}
-	assert(t, !m.Has("test"))
-	assert(t, m.Len() == 0)
+	Assert(t, !m.Has("test"))
+	Assert(t, m.Len() == 0)
 	if _, ok := m.Get("test"); ok { t.Fail() }
-	assertEquals(
+	AssertEquals(
 		t,
 		m.Arr(reflect.TypeOf([]string{})),
 		[]string{},
 	)
 
 	m.Set("test", "a test")
-	assert(t, m.Has("test"))
-	assert(t, m.Len() == 1)
+	Assert(t, m.Has("test"))
+	Assert(t, m.Len() == 1)
 	(func() {
 		value, ok := m.Get("test")
-		assertEquals(t, value, "a test")
-		assert(t, ok)
+		AssertEquals(t, value, "a test")
+		Assert(t, ok)
 	})()
-	assertEquals(
+	AssertEquals(
 		t,
 		m.Arr(reflect.TypeOf([]string{})),
 		[]string{"a test"},
 	)
 
 	m.Del("test")
-	assert(t, !m.Has("test"))
-	assert(t, m.Len() == 0)
+	Assert(t, !m.Has("test"))
+	Assert(t, m.Len() == 0)
 	if _, ok := m.Get("test"); ok { t.Fail() }
-	assertEquals(
+	AssertEquals(
 		t,
 		m.Arr(reflect.TypeOf([]string{})),
 		[]string{},
 	)
 }
 func TestTypes(t *testing.T) {
-	assertEquals(
+	AssertEquals(
 		t,
 		Types(false),
 		[]reflect.Type{
 			reflect.TypeOf(Frame{}),
 			reflect.TypeOf(Frames{}),
 			reflect.TypeOf(ParsedArrayType{}),
-			reflect.TypeOf(ParsedFunc{}),
+			reflect.TypeOf(ParsedChanType{}),
+			reflect.TypeOf(ParsedEllipsisType{}),
+			reflect.TypeOf(ParsedFuncType{}),
 			reflect.TypeOf(ParsedInterface{}),
+			reflect.TypeOf(ParsedMapType{}),
 			reflect.TypeOf(ParsedNamedType{}),
 			reflect.TypeOf(ParsedPackage{}),
 			reflect.TypeOf(ParsedStruct{}),
@@ -130,38 +133,38 @@ func TestTypes(t *testing.T) {
 }
 func TestParseTypes(t *testing.T) {
 	parsed := ParseTypes()
-	testInterface := parsed.Interfaces["TestInterface"]
-	testType1 := parsed.Structs["TestType1"]
-	testType2 := parsed.Structs["TestType2"]
-	assertEquals(
+	testInterface := parsed.Interfaces()["TestInterface"]
+	testType1 := parsed.Structs()["TestType1"]
+	testType2 := parsed.Structs()["TestType2"]
+	AssertEquals(
 		t,
 		testInterface,
 		ParsedInterface{
-			Methods: map[string]ParsedFunc{
+			methods: map[string]ParsedFuncType{
 				"TestMethod": {},
 			},
 		},
 	)
-	assertEquals(
+	AssertEquals(
 		t,
 		testType1,
 		ParsedStruct{
-			Methods: map[string]ParsedFunc{},
+			methods: map[string]ParsedFuncType{},
 		},
 	)
-	assertEquals(
+	AssertEquals(
 		t,
 		testType2,
 		ParsedStruct{
-			Methods: map[string]ParsedFunc{
+			methods: map[string]ParsedFuncType{
 				"TestMethod":  {},
-				"testMethod2": {Out: []ParsedType{ParsedNamedType{"bool"}}},
+				"testMethod2": {out: []ParsedType{ParsedNamedType{"bool"}}},
 			},
 		},
 	)
 
-	assert(t, !testType1.Implements(testInterface))
-	assert(t, testType2.Implements(testInterface))
+	Assert(t, !testType1.Implements(testInterface))
+	Assert(t, testType2.Implements(testInterface))
 }
 
 type TestInterface interface { TestMethod() }

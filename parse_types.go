@@ -11,16 +11,22 @@ import (
 )
 
 type ParsedPackage struct {
-	Structs    map[string]ParsedStruct
-	Interfaces map[string]ParsedInterface
+	structs    map[string]ParsedStruct
+	interfaces map[string]ParsedInterface
+}
+func (parsedPackage ParsedPackage) Structs() map[string]ParsedStruct {
+	return parsedPackage.structs
+}
+func (parsedPackage ParsedPackage) Interfaces() map[string]ParsedInterface {
+	return parsedPackage.interfaces
 }
 
 type ParsedStruct struct {
-	Methods map[string]ParsedFunc
+	methods map[string]ParsedFuncType
 }
 func (parsedStruct ParsedStruct) Implements(parsedInterface ParsedInterface) bool {
-	for methodName, interfaceMethod := range parsedInterface.Methods {
-		if structMethod, ok := parsedStruct.Methods[methodName]; ok {
+	for methodName, interfaceMethod := range parsedInterface.methods {
+		if structMethod, ok := parsedStruct.methods[methodName]; ok {
 			if !structMethod.SignatureEquals(interfaceMethod) { return false }
 		} else {
 			return false
@@ -29,20 +35,27 @@ func (parsedStruct ParsedStruct) Implements(parsedInterface ParsedInterface) boo
 	return true
 }
 
-type ParsedFunc struct {
-	In  []ParsedType
-	Out []ParsedType
+type ParsedFuncType struct {
+	in  []ParsedType
+	out []ParsedType
 }
-func (parsedFunc ParsedFunc) SignatureEquals(other ParsedFunc) bool {
-	if len(parsedFunc.In) != len(other.In) { return false }
-	if len(parsedFunc.Out) != len(other.Out) { return false }
-	for i, in := range parsedFunc.In {
-		if !in.Equals(other.In[i]) { return false }
+func (parsedFuncType ParsedFuncType) SignatureEquals(other ParsedFuncType) bool {
+	if len(parsedFuncType.in) != len(other.in) { return false }
+	if len(parsedFuncType.out) != len(other.out) { return false }
+	for i, in := range parsedFuncType.in {
+		if !in.Equals(other.in[i]) { return false }
 	}
-	for i, out := range parsedFunc.Out {
-		if !out.Equals(other.Out[i]) { return false }
+	for i, out := range parsedFuncType.out {
+		if !out.Equals(other.out[i]) { return false }
 	}
 	return true
+}
+func (parsedFuncType ParsedFuncType) Equals(other ParsedType) bool {
+	if otherParsedFuncType, ok := other.(ParsedFuncType); ok {
+		return parsedFuncType.SignatureEquals(otherParsedFuncType)
+	} else {
+		return false
+	}
 }
 
 type ParsedType interface {
@@ -50,13 +63,13 @@ type ParsedType interface {
 }
 
 type ParsedInterface struct {
-	Methods map[string]ParsedFunc
+	methods map[string]ParsedFuncType
 }
 func (parsedInterface ParsedInterface) Equals(other ParsedType) bool {
 	if otherParsedInterface, ok1 := other.(ParsedInterface); ok1 {
-		if len(parsedInterface.Methods) != len(otherParsedInterface.Methods) { return false }
-		for methodName, parsedMethod := range parsedInterface.Methods {
-			if otherParsedMethod, ok2 := otherParsedInterface.Methods[methodName]; ok2 {
+		if len(parsedInterface.methods) != len(otherParsedInterface.methods) { return false }
+		for methodName, parsedMethod := range parsedInterface.methods {
+			if otherParsedMethod, ok2 := otherParsedInterface.methods[methodName]; ok2 {
 				if !parsedMethod.SignatureEquals(otherParsedMethod) { return false }
 			} else {
 				return false
@@ -69,11 +82,11 @@ func (parsedInterface ParsedInterface) Equals(other ParsedType) bool {
 }
 
 type ParsedNamedType struct {
-	LiteralName string
+	literalName string
 }
 func (parsedNamedType ParsedNamedType) Equals(other ParsedType) bool {
 	if otherParsedNamedType, ok := other.(ParsedNamedType); ok {
-		return parsedNamedType.LiteralName == otherParsedNamedType.LiteralName
+		return parsedNamedType.literalName == otherParsedNamedType.literalName
 	} else {
 		return false
 	}
@@ -87,6 +100,41 @@ func (parsedArrayType ParsedArrayType) Equals(other ParsedType) bool {
 	if otherParsedArrayType, ok := other.(ParsedArrayType); ok {
 		return parsedArrayType.length == otherParsedArrayType.length &&
 			parsedArrayType.elementType.Equals(otherParsedArrayType.elementType)
+	} else {
+		return false
+	}
+}
+
+type ParsedMapType struct {
+	keyType     ParsedType
+	elementType ParsedType
+}
+func (parsedMapType ParsedMapType) Equals(other ParsedType) bool {
+	if otherParsedMapType, ok := other.(ParsedMapType); ok {
+		return parsedMapType.keyType.Equals(otherParsedMapType.keyType) &&
+			parsedMapType.elementType.Equals(otherParsedMapType.elementType)
+	} else {
+		return false
+	}
+}
+
+type ParsedChanType struct {
+	valueType ParsedType
+}
+func (parsedChanType ParsedChanType) Equals(other ParsedType) bool {
+	if otherParsedChanType, ok := other.(ParsedChanType); ok {
+		return parsedChanType.valueType.Equals(otherParsedChanType.valueType)
+	} else {
+		return false
+	}
+}
+
+type ParsedEllipsisType struct {
+	elementType ParsedType
+}
+func (parsedEllipsisType ParsedEllipsisType) Equals(other ParsedType) bool {
+	if otherParsedEllipsisType, ok := other.(ParsedEllipsisType); ok {
+		return parsedEllipsisType.elementType.Equals(otherParsedEllipsisType.elementType)
 	} else {
 		return false
 	}
@@ -128,11 +176,11 @@ func ParseTypes() ParsedPackage {
 		//		getMethods := func(hasMethods interface{
 		//			NumMethods() int
 		//			Method(int) *types2.Func
-		//		}) map[string]ParsedFunc {
-		//			methods := make(map[string]ParsedFunc)
+		//		}) map[string]ParsedFuncType {
+		//			methods := make(map[string]ParsedFuncType)
 		//			for i := 0; i < hasMethods.NumMethods(); i++ {
 		//				method := hasMethods.Method(i)
-		//				methods[method.Name()] = ParsedFunc{
+		//				methods[method.Name()] = ParsedFuncType{
 		//					Signature: method.Type().String(), // MAYBE: trim argument names
 		//				}
 		//			}
@@ -140,10 +188,10 @@ func ParseTypes() ParsedPackage {
 		//		}
 		//		underlying := named.Underlying()
 		//		if _interface, ok := underlying.(*types2.Interface); ok {
-		//			parsedInterfaces[named.Obj().Name()] = ParsedInterface{Methods: getMethods(_interface)}
+		//			parsedInterfaces[named.Obj().Name()] = ParsedInterface{methods: getMethods(_interface)}
 		//		}
 		//		if _, ok := underlying.(*types2.Struct); ok {
-		//			parsedStructs[named.Obj().Name()] = ParsedStruct{Methods: getMethods(named)}
+		//			parsedStructs[named.Obj().Name()] = ParsedStruct{methods: getMethods(named)}
 		//		}
 		//	}
 		//}
@@ -156,7 +204,7 @@ func ParseTypes() ParsedPackage {
 							specName := typeSpec.Name.Name
 							astType := typeSpec.Type
 							if _, isStructType := astType.(*ast.StructType); isStructType {
-								parsedStructs[specName] = ParsedStruct{Methods: make(map[string]ParsedFunc)}
+								parsedStructs[specName] = ParsedStruct{methods: make(map[string]ParsedFuncType)}
 							}
 							if astInterfaceType, isInterfaceType := astType.(*ast.InterfaceType); isInterfaceType {
 								parsedInterfaces[specName] = parseInterface(astInterfaceType)
@@ -180,7 +228,7 @@ func ParseTypes() ParsedPackage {
 							if ident, isIdent := receiverType.(*ast.Ident); isIdent {
 								receiverName := ident.Name
 								if _, structExists := parsedStructs[receiverName]; structExists {
-									parsedStructs[receiverName].Methods[funcDecl.Name.Name] = parseFunc(funcDecl.Type)
+									parsedStructs[receiverName].methods[funcDecl.Name.Name] = parseFunc(funcDecl.Type)
 								}
 							}
 						}
@@ -191,28 +239,26 @@ func ParseTypes() ParsedPackage {
 	}
 
 	return ParsedPackage{
-		Structs:    parsedStructs,
-		Interfaces: parsedInterfaces,
+		structs:    parsedStructs,
+		interfaces: parsedInterfaces,
 	}
 }
 func parseInterface(astInterfaceType *ast.InterfaceType) ParsedInterface {
-	parsedMethods := make(map[string]ParsedFunc)
+	parsedMethods := make(map[string]ParsedFuncType)
 	for _, methodAstField := range astInterfaceType.Methods.List {
-		names := methodAstField.Names
-		if len(names) != 1 { panic("non-singular method name") }
-		methodName := names[0].Name
-
-		_type := methodAstField.Type
-		if astFuncType, isFuncType := _type.(*ast.FuncType); isFuncType {
-			parsedMethods[methodName] = parseFunc(astFuncType)
-		} else {
-			panic("method is not a func")
+		if astFuncType, isFuncType := methodAstField.Type.(*ast.FuncType); isFuncType {
+			names := methodAstField.Names
+			if len(names) != 1 {
+				Dump2(astInterfaceType)
+				panic("non-singular method name")
+			}
+			parsedMethods[names[0].Name] = parseFunc(astFuncType)
 		}
 	}
 
-	return ParsedInterface{Methods: parsedMethods}
+	return ParsedInterface{methods: parsedMethods}
 }
-func parseFunc(astFuncType *ast.FuncType) ParsedFunc {
+func parseFunc(astFuncType *ast.FuncType) ParsedFuncType {
 	var in []ParsedType
 	paramsList := astFuncType.Params.List
 	if len(paramsList) > 0 {
@@ -233,37 +279,55 @@ func parseFunc(astFuncType *ast.FuncType) ParsedFunc {
 		}
 	}
 
-	return ParsedFunc{
-		In:  in,
-		Out: out,
+	return ParsedFuncType{
+		in:  in,
+		out: out,
 	}
 }
 func parseType(astExpr ast.Expr) ParsedType {
-	if astIdent, isIdent := astExpr.(*ast.Ident); isIdent {
-		return ParsedNamedType{astIdent.Name}
-	} else if astInterfaceType, isInterface := astExpr.(*ast.InterfaceType); isInterface {
-		return parseInterface(astInterfaceType)
-	} else if astSelectorExpr, isSelectorExpr := astExpr.(*ast.SelectorExpr); isSelectorExpr {
-		return ParsedNamedType{fmt.Sprintf(
-			"%s.%s",
-			astSelectorExpr.X.(*ast.Ident).Name,
-			astSelectorExpr.Sel.Name,
-		)}
-	} else if astStarExpr, isStarExpr := astExpr.(*ast.StarExpr); isStarExpr {
-		parsedX := parseType(astStarExpr.X)
-		if parsedNamedType, isNamedType := parsedX.(ParsedNamedType); isNamedType {
-			return ParsedNamedType{"*" + parsedNamedType.LiteralName}
-		} else {
-			panic("ast.StarExpr.X is not a named type")
-		}
-	} else if astArrayType, isArrayType := astExpr.(*ast.ArrayType); isArrayType {
-		if astArrayType.Len != nil { panic("TODO") }
-		return ParsedArrayType{
-			length:      -1,
-			elementType: parseType(astArrayType.Elt),
-		}
-	} else {
-		Dump2(astExpr)
-		panic("cannot parse expr as type")
+	switch astExpr.(type) {
+		case *ast.Ident:
+			return ParsedNamedType{astExpr.(*ast.Ident).Name}
+		case *ast.InterfaceType:
+			return parseInterface(astExpr.(*ast.InterfaceType))
+		case *ast.SelectorExpr:
+			return ParsedNamedType{fmt.Sprintf(
+				"%s.%s",
+				astExpr.(*ast.SelectorExpr).X.(*ast.Ident).Name,
+				astExpr.(*ast.SelectorExpr).Sel.Name,
+			)}
+		case *ast.StarExpr:
+			parsedX := parseType(astExpr.(*ast.StarExpr).X)
+			if parsedNamedType, isNamedType := parsedX.(ParsedNamedType); isNamedType {
+				return ParsedNamedType{"*" + parsedNamedType.literalName}
+			} else {
+				panic("ast.StarExpr.X is not a named type")
+			}
+		case *ast.ArrayType:
+			if astExpr.(*ast.ArrayType).Len != nil {
+				panic("TODO")
+			}
+			return ParsedArrayType{
+				length:      -1,
+				elementType: parseType(astExpr.(*ast.ArrayType).Elt),
+			}
+		case *ast.MapType:
+			return ParsedMapType{
+				keyType:     parseType(astExpr.(*ast.MapType).Key),
+				elementType: parseType(astExpr.(*ast.MapType).Value),
+			}
+		case *ast.ChanType:
+			return ParsedChanType{
+				valueType: parseType(astExpr.(*ast.ChanType).Value),
+			}
+		case *ast.Ellipsis:
+			return ParsedEllipsisType{
+				elementType: parseType(astExpr.(*ast.Ellipsis).Elt),
+			}
+		case *ast.FuncType:
+			return parseFunc(astExpr.(*ast.FuncType))
+		default:
+			Dump2(astExpr)
+			panic("cannot parse expr as type")
 	}
 }

@@ -1,28 +1,31 @@
 package my
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 )
 
-func areEqual(a interface{}, b interface{}) bool {
+func AreEqual(a interface{}, b interface{}) bool {
 	return reflect.DeepEqual(a, b)
 }
-func fail(t *testing.T, context ...interface{}) {
-	if t == nil {
-		for _, arg := range context { Dump(arg) }
-		panic(context)
+func Fail(t *testing.T, context ...interface{}) {
+	fmt.Println(Trace(true).SkipFile(1))
+	for _, c := range context { Dump2(c) }
+	if t != nil {
+		t.Fail()
+	} else {
+		panic("check failed")
 	}
-	t.Error(context...)
 }
-func assert(t *testing.T, statement bool, context ...interface{}) {
+func Assert(t *testing.T, statement bool, context ...interface{}) {
 	context = append([]interface{}{"assertion failed"}, context...)
-	if !statement { fail(t, context...) }
+	if !statement { Fail(t, context...) }
 }
-func assertEquals(t *testing.T, a interface{}, b interface{}, context ...interface{}) {
+func AssertEquals(t *testing.T, a interface{}, b interface{}, context ...interface{}) {
 	args := append([]interface{}{"vars are not equal", a, b}, context...)
-	if !areEqual(a, b) { fail(t, args...) }
+	if !AreEqual(a, b) { Fail(t, args...) }
 }
-func assertNotEqual(t *testing.T, a interface{}, b interface{}) {
-	if areEqual(a, b) { fail(t, "vars are equal", a, b) }
+func AssertNotEqual(t *testing.T, a interface{}, b interface{}) {
+	if AreEqual(a, b) { Fail(t, "vars are equal", a, b) }
 }
