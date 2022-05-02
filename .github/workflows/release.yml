@@ -8,6 +8,7 @@ on:
 jobs:
   release:
     runs-on: ubuntu-latest
+    environment: workflow-release
     steps:
       - uses: actions/checkout@v3  # MAYBE: remove
       - name: Get tag
