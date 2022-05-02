@@ -8,7 +8,7 @@ on:
 jobs:
   release:
     runs-on: ubuntu-latest
-    environment: workflow-release
+#    environment: workflow-release
     steps:
       - uses: actions/checkout@v3  # MAYBE: remove
       - name: Get tag
@@ -17,4 +17,4 @@ jobs:
       - uses: softprops/action-gh-release@v1
         with:
           tag_name: ${{ steps.get_tag.outputs.tag }}
-          token: ${{ secrets.WORKFLOW_RELEASE_TOKEN }}
+          token: ${{ secrets.MYGO_WORKFLOW_RELEASE_TOKEN }}
