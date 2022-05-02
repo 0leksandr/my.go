@@ -15,3 +15,6 @@ fi
 
 git tag "$tag"  # MAYBE: use annotated tags
 git push origin "$tag"
+
+#git push --delete origin v1.3.3
+#git tag --delete v1.3.3
