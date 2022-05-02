@@ -10,12 +10,8 @@ jobs:
     runs-on: ubuntu-latest
     environment: workflow-release
     steps:
-      - uses: actions/checkout@v3  # MAYBE: remove
-      - name: Get tag
-        id: get_tag
-        run: echo ::set-output name=tag::${GITHUB_REF/refs\/tags\//}
+#      - uses: actions/checkout@v3  # MAYBE: remove
       - uses: softprops/action-gh-release@v1
         if: startsWith(github.ref, 'refs/tags/')
         with:
-#          tag_name: ${{ steps.get_tag.outputs.tag }}
           token: ${{ secrets.WORKFLOW_RELEASE_TOKEN }}
