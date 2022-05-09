@@ -7,7 +7,7 @@ import (
 	"os/exec"
 )
 
-func RunCommand(dir string, cmd string, onStdout func(string), onStderr func(string)) bool {
+func StartCommand(dir string, cmd string, onStdout func(string), onStderr func(string)) *exec.Cmd {
 	command := exec.Command("sh", "-c", cmd)
 	command.Dir = dir
 
@@ -33,7 +33,12 @@ func RunCommand(dir string, cmd string, onStdout func(string), onStderr func(str
 		}()
 	}
 
-	return command.Run() == nil
+	Must(command.Start())
+
+	return command
+}
+func RunCommand(dir string, cmd string, onStdout func(string), onStderr func(string)) bool {
+	return StartCommand(dir, cmd, onStdout, onStderr).Wait() == nil
 }
 func WriteToStderr(text string) {
 	_, err := fmt.Fprintln(os.Stderr, text)

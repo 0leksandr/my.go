@@ -5,6 +5,7 @@ import (
 	"os"
 	"reflect"
 	"testing"
+	"time"
 )
 
 func TestDump(t *testing.T) {
@@ -13,7 +14,7 @@ func TestDump(t *testing.T) {
 func TestTrace(t *testing.T) {
 	currentDir, err := os.Getwd()
 	PanicIf(err)
-	AssertEquals(t, Trace(false), Frames{{currentDir + "/my_test.go", 16}})
+	AssertEquals(t, Trace(false), Frames{{currentDir + "/my_test.go", 17}})
 
 	fullTrace := Trace(true)
 	Assert(t, len(fullTrace) == 3, fullTrace)
@@ -165,6 +166,37 @@ func TestParseTypes(t *testing.T) {
 
 	Assert(t, !testType1.Implements(testInterface))
 	Assert(t, testType2.Implements(testInterface))
+}
+func TestStartCommand(t *testing.T) {
+	outSlice := make([]string, 0)
+	cmd := StartCommand(
+		"",
+		"sleep 0.1 && echo 1 && sleep 0.1 && echo 2",
+		func(out string) { outSlice = append(outSlice, out) },
+		func(err string) { panic(err) },
+	)
+	result := make(chan error)
+	go func() {
+		result <- cmd.Wait()
+		close(result)
+	}()
+	for _, testCase := range []struct {
+		sleep       time.Duration
+		exited      bool
+		expectedOut []string
+	}{
+		{90 * time.Millisecond, false, []string{}},
+		{20 * time.Millisecond, false, []string{"1"}},
+		{80 * time.Millisecond, false, []string{"1"}},
+		{20 * time.Millisecond, true, []string{"1", "2"}},
+	} {
+		time.Sleep(testCase.sleep)
+		select {
+			case status := <- result: Assert(t, status == nil)
+			default: Assert(t, !testCase.exited)
+		}
+		AssertEquals(t, outSlice, testCase.expectedOut)
+	}
 }
 
 type TestInterface interface { TestMethod() }
