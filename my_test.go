@@ -119,6 +119,7 @@ func TestTypes(t *testing.T) {
 		[]reflect.Type{
 			reflect.TypeOf(Frame{}),
 			reflect.TypeOf(Frames{}),
+			reflect.TypeOf(OrderedMapPair{}),
 			reflect.TypeOf(ParsedArrayType{}),
 			reflect.TypeOf(ParsedChanType{}),
 			reflect.TypeOf(ParsedEllipsisType{}),
@@ -197,6 +198,63 @@ func TestStartCommand(t *testing.T) {
 		}
 		AssertEquals(t, outSlice, testCase.expectedOut)
 	}
+}
+func TestOrderedMap(t *testing.T) {
+	m := OrderedMap{}.New()
+	checkMap := func(lenKeys, lenValues, lenIndices, lenDeletedIndices int) {
+		Assert(t, len(m.keys) == lenKeys)
+		Assert(t, len(m.values) == lenValues)
+		Assert(t, len(m.indices) == lenIndices)
+		Assert(t, len(m.deletedIndices) == lenDeletedIndices)
+	}
+	checkMap(0, 0, 0, 0)
+	m.Add("key1", "value1")
+	m.Add("key2", "value2")
+	m.Add("key3", "value3")
+	m.Add("key4", "value4")
+	m.Add("key5", "value5")
+	m.Add("key6", "value6")
+	m.Add("key7", "value7")
+	checkMap(7, 7, 7, 0)
+	AssertEquals(
+		t,
+		m.Pairs(),
+		[]OrderedMapPair{
+			{"key1", "value1"},
+			{"key2", "value2"},
+			{"key3", "value3"},
+			{"key4", "value4"},
+			{"key5", "value5"},
+			{"key6", "value6"},
+			{"key7", "value7"},
+		},
+	)
+	m.Del("key2")
+	checkMap(7, 7, 6, 1)
+	m.Del("key6")
+	m.Del("key4")
+	checkMap(7, 7, 4, 3)
+	AssertEquals(
+		t,
+		m.Pairs(),
+		[]OrderedMapPair{
+			{"key1", "value1"},
+			{"key3", "value3"},
+			{"key5", "value5"},
+			{"key7", "value7"},
+		},
+	)
+	m.Del("key7")
+	checkMap(3, 3, 3, 0)
+	AssertEquals(
+		t,
+		m.Pairs(),
+		[]OrderedMapPair{
+			{"key1", "value1"},
+			{"key3", "value3"},
+			{"key5", "value5"},
+		},
+	)
 }
 
 type TestInterface interface { TestMethod() }
