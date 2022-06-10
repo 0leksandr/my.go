@@ -18,11 +18,12 @@ func (OrderedMap) New() OrderedMap {
 		deletedIndices: make(map[int]bool),
 	}
 }
-func (m *OrderedMap) Add(key interface{}, value interface{}) {
+func (m *OrderedMap) Add(key interface{}, value interface{}) *OrderedMap {
 	if m.Has(key) { panic("key already filled") }
 	m.keys = append(m.keys, key)
 	m.values = append(m.values, value)
 	m.indices[key] = len(m.keys) - 1
+	return m
 }
 func (m OrderedMap) Len() int {
 	return len(m.indices)
@@ -63,18 +64,50 @@ func (m *OrderedMap) Del(key interface{}) {
 		}
 	}
 }
-func (m OrderedMap) Pairs() []OrderedMapPair {
-	pairs := make([]OrderedMapPair, 0, m.Len())
+func (m OrderedMap) Each(f func(key interface{}, value interface{})) {
 	for index, key := range m.keys {
 		if !m.deletedIndices[index] {
-			pairs = append(
-				pairs,
-				OrderedMapPair{
-					Key:   key,
-					Value: m.values[index],
-				},
-			)
+			f(key, m.values[index])
 		}
 	}
+}
+func (m OrderedMap) Pairs() []OrderedMapPair {
+	pairs := make([]OrderedMapPair, 0, m.Len())
+	m.Each(func(key interface{}, value interface{}) {
+		pairs = append(
+			pairs,
+			OrderedMapPair{
+				Key:   key,
+				Value: value,
+			},
+		)
+	})
 	return pairs
+}
+func (m OrderedMap) Copy() OrderedMap {
+	keys := make([]interface{}, 0, m.Len())
+	values := make([]interface{}, 0, m.Len())
+	indices := make(map[interface{}]int, m.Len())
+	var index int
+	m.Each(func(key interface{}, value interface{}) {
+		keys = append(keys, key)
+		values = append(values, value)
+		indices[key] = index
+		index++
+	})
+	return OrderedMap{
+		keys:           keys,
+		values:         values,
+		indices:        indices,
+		deletedIndices: make(map[int]bool),
+	}
+}
+func (m OrderedMap) Equals(other OrderedMap) bool {
+	if m.Len() != other.Len() { return false }
+	equals := true
+	m.Each(func(key interface{}, value interface{}) {
+		otherValue, ok := other.Get(key)
+		if !ok || value != otherValue { equals = false }
+	})
+	return equals
 }
