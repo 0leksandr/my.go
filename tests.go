@@ -10,7 +10,7 @@ func AreEqual(a interface{}, b interface{}) bool {
 	return reflect.DeepEqual(a, b)
 }
 func Fail(t *testing.T, context ...interface{}) {
-	fmt.Println(Trace(true).SkipFile(1))
+	fmt.Println(Trace{}.New().SkipFile(1)[0])
 	for _, c := range context { Dump2(c) }
 	if t != nil {
 		t.Fail()
