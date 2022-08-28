@@ -51,10 +51,14 @@ func (m *OrderedMap) Del(key interface{}) {
 
 			keys := make([]interface{}, 0, len(m.indices))
 			values := make([]interface{}, 0, len(m.indices))
+			j := 0
 			for _, _index := range indices {
 				if _index != -1 {
-					keys = append(keys, m.keys[_index])
+					key2 := m.keys[_index]
+					keys = append(keys, key2)
 					values = append(values, m.values[_index])
+					m.indices[key2] = j
+					j++
 				}
 			}
 

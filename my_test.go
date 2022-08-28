@@ -321,6 +321,15 @@ func TestOrderedMap(t *testing.T) {
 			{"key5", "value5"},
 		},
 	)
+
+	m3 := OrderedMap{}.New()
+	m3.Add("key1", "value1")
+	m3.Add("key2", "value2")
+	m3.Del("key1")
+	m3.Add("key1", "value3")
+	m3.Del("key2")
+	key1, _ := m3.Get("key1")
+	AssertEquals(t, key1, "value3")
 }
 
 type TestInterface interface { TestMethod() }
