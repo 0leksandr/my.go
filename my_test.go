@@ -339,8 +339,8 @@ func TestError(t *testing.T) {
 		Error{
 			error: errors.New("test"),
 			trace: Trace{
-				{"my_test.go", 325},
-				{"my_test.go", 329},
+				{"my_test.go", 334},
+				{"my_test.go", 338},
 			},
 		},
 	)
