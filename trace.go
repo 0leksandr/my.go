@@ -15,45 +15,55 @@ func (frame Frame) String() string {
 	return fmt.Sprintf("%v:%d", frame.File, frame.Line)
 }
 
-type Frames []Frame
-func (frames Frames) SkipFile(n int) Frame {
-	file := frames[0].File
-	i := 0
-	for n > 0 {
-		if frames[i].File == file {
-			i++
-		} else {
-			n--
-			file = frames[i].File
-		}
-	}
-	return frames[i]
-}
-
-func Trace(full bool) Frames {
+type Trace []Frame
+func (Trace) New() Trace {
 	size := 1<<8
-	pc := make([]uintptr, size, size)
+	pc := make([]uintptr, size)
 	runtime.Callers(2, pc)
 	frames := runtime.CallersFrames(pc)
-	var trace Frames
-	add := func(frame runtime.Frame) {
+	var trace Trace
+	for {
+		frame, more := frames.Next()
 		trace = append(trace, Frame{
 			File: frame.File,
 			Line: frame.Line,
 		})
+		if !more { break }
 	}
-	frame, more := frames.Next()
-	if !more { panic("weird frames") }
-	var projectRootRe *regexp.Regexp
-	if !full {
-		ps := string(os.PathSeparator)
-		projectRoot := regexp.MustCompile(fmt.Sprintf("^(.+%s)[^%s]+$", ps, ps)).FindStringSubmatch(frame.File)[1]
-		projectRootRe = regexp.MustCompile(fmt.Sprintf("^%s[^%s]+$", projectRoot, ps))
+
+	return trace
+}
+func (trace Trace) SkipFile(n int) Trace {
+	file := trace[0].File
+	i := 0
+	for n > 0 {
+		if trace[i].File == file {
+			i++
+		} else {
+			n--
+			file = trace[i].File
+		}
 	}
-	add(frame)
-	for more {
-		frame, more = frames.Next()
-		if projectRootRe == nil || projectRootRe.MatchString(frame.File) { add(frame) }
+	return trace[i:]
+}
+func (trace Trace) Local() Trace {
+	var localTrace Trace
+	sep := string(os.PathSeparator)
+	firstFrame := trace[0]
+	projectRoot := regexp.MustCompile(fmt.Sprintf("^(.+%s)[^%s]+$", sep, sep)).FindStringSubmatch(firstFrame.File)[1]
+	projectRootRe := regexp.MustCompile(fmt.Sprintf("^%s([^%s]+)$", projectRoot, sep))
+	for _, frame := range trace {
+		if projectRootRe.MatchString(frame.File) {
+			frame.File = projectRootRe.FindStringSubmatch(frame.File)[1]
+			localTrace = append(localTrace, frame)
+		}
 	}
+
+	return localTrace
+}
+
+func GetTrace(full bool) Trace {
+	trace := Trace{}.New()[1:]
+	if !full { trace = trace.Local() }
 	return trace
 }

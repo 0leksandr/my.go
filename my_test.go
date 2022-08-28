@@ -2,7 +2,6 @@ package my
 
 import (
 	"errors"
-	"os"
 	"reflect"
 	"testing"
 	"time"
@@ -11,12 +10,10 @@ import (
 func TestDump(t *testing.T) {
 	Dump("hi")
 }
-func TestTrace(t *testing.T) {
-	currentDir, err := os.Getwd()
-	PanicIf(err)
-	AssertEquals(t, Trace(false), Frames{{currentDir + "/my_test.go", 17}})
+func TestGetTrace(t *testing.T) {
+	AssertEquals(t, GetTrace(false), Trace{{"my_test.go", 14}})
 
-	fullTrace := Trace(true)
+	fullTrace := GetTrace(true)
 	Assert(t, len(fullTrace) == 3, fullTrace)
 }
 func TestSdump2(t *testing.T) {
@@ -117,8 +114,8 @@ func TestTypes(t *testing.T) {
 		t,
 		Types(false),
 		[]reflect.Type{
+			reflect.TypeOf(Error{}),
 			reflect.TypeOf(Frame{}),
-			reflect.TypeOf(Frames{}),
 			reflect.TypeOf(OrderedMapPair{}),
 			reflect.TypeOf(ParsedArrayType{}),
 			reflect.TypeOf(ParsedChanType{}),
@@ -130,6 +127,7 @@ func TestTypes(t *testing.T) {
 			reflect.TypeOf(ParsedPackage{}),
 			reflect.TypeOf(ParsedStruct{}),
 			reflect.TypeOf((*ParsedType)(nil)).Elem(),
+			reflect.TypeOf(Trace{}),
 		},
 	)
 }
@@ -330,6 +328,22 @@ func TestOrderedMap(t *testing.T) {
 	m3.Del("key2")
 	key1, _ := m3.Get("key1")
 	AssertEquals(t, key1, "value3")
+}
+func TestError(t *testing.T) {
+	f := func() error {
+		return Error{}.New("test")
+	}
+	AssertEquals(
+		t,
+		f(),
+		Error{
+			error: errors.New("test"),
+			trace: Trace{
+				{"my_test.go", 325},
+				{"my_test.go", 329},
+			},
+		},
+	)
 }
 
 type TestInterface interface { TestMethod() }
