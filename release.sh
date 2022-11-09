@@ -8,7 +8,7 @@ if [ "$last_tag" = "$(echo "$last_tag\n$tag" |sort --version-sort |tail -n1)" ];
   exit 1
 fi
 
-if ! echo "$tag" |grep -Eq "v([0-9]+\.){2}[0-9]+$"; then
+if ! echo "$tag" |grep -Eq "^v([0-9]+\.){2}[0-9]+$"; then
   echo>&2 "tag (vA.B.C) required"
   exit 1
 fi
