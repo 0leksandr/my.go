@@ -32,17 +32,20 @@ func (ProgressBar) New(description string, totalSteps int64) ProgressBar {
 
 	return bar
 }
-func (bar *ProgressBar) Add() {
+func (bar *ProgressBar) AddI(i int64) {
 	bar.mutex.Lock()
-	bar.current++
+	bar.current += i
 	bar.updated()
 	bar.mutex.Unlock()
+}
+func (bar *ProgressBar) Add() {
+	bar.AddI(1)
 }
 func (bar *ProgressBar) UpdateTotal(total int64) {
 	bar.total = total
 	bar.updated()
 }
-func (bar ProgressBar) FmtDuration(duration time.Duration) string {
+func (ProgressBar) FmtDuration(duration time.Duration) string {
 	return regexp.
 		MustCompile("^([^.]+\\.\\d{2})\\d*([^0-9]+)$").
 		ReplaceAllString(duration.String(), "$1$2")
@@ -96,9 +99,22 @@ func (bar ProgressBar) estimateLeft() time.Duration {
 	)
 }
 func testProgress() {
-	for _, nrSteps := range []int64{1, 3, 10, 11, 30, 100, 300, 999, 1000, 1001} {
-		sleep := int64(1 * time.Second) / nrSteps
-		progress := ProgressBar{}.New(fmt.Sprintf("Test %4d", nrSteps), nrSteps)
+	testCaseDuration := 1 * time.Second
+	for _, nrSteps := range [...]int64{
+		1,
+		3,
+		10,
+		11,
+		30,
+		100,
+		300,
+		999,
+		1000,
+		1001,
+		1000000,
+	} {
+		sleep := int64(testCaseDuration) / nrSteps
+		progress := ProgressBar{}.New(fmt.Sprintf("Test %7d", nrSteps), nrSteps)
 		for c := int64(0); c < nrSteps; c++ {
 			time.Sleep(time.Duration(sleep))
 			progress.Add()

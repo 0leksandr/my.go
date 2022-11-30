@@ -187,6 +187,10 @@ func (db DB) Delete(table string, where map[string]interface{}) {
 	PanicIf(err)
 }
 
+func (db DB) Exec(query string, args ...interface{}) (sql.Result, error) {
+	return db.db.Exec(query, args...)
+}
+
 func formatWhere(where map[string]interface{}) (string, []interface{}) {
 	var whereStmt string
 	var whereValues []interface{}

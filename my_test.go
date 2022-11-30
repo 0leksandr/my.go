@@ -345,6 +345,11 @@ func TestError(t *testing.T) {
 		},
 	)
 }
+func TestProgressBar(t *testing.T) {
+	if false {
+		testProgress()
+	}
+}
 
 type TestInterface interface { TestMethod() }
 //goland:noinspection GoUnusedExportedType
