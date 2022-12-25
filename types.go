@@ -4,7 +4,6 @@ import (
 	"go/parser"
 	"go/token"
 	"reflect"
-	"runtime"
 	"unsafe"
 )
 
@@ -15,9 +14,12 @@ func reflect_typelinks() ([]unsafe.Pointer, [][]int32)
 func reflect_add(unsafe.Pointer, uintptr, string) unsafe.Pointer
 
 func Types(all bool) []reflect.Type {
+	var prefix string
+	if !all { prefix = pkgName(Trace{}.New().SkipFile(1)[0].File) + "." }
+	return getTypes(prefix)
+}
+func getTypes(prefix string) []reflect.Type {
 	types := make([]reflect.Type, 0)
-	var pkgPath string
-	if !all { pkgPath = pkgName(1) + "." }
 	sections, offsets := reflect_typelinks()
 	for i, base := range sections {
 		for _, offset := range offsets[i] {
@@ -25,7 +27,7 @@ func Types(all bool) []reflect.Type {
 			t := reflect.TypeOf(*(*interface{})(unsafe.Pointer(&typeAddr)))
 			if t.Kind() == reflect.Ptr {
 				t = t.Elem()
-				if pkgPath == "" || stringStartsWith(t.String(), pkgPath) {
+				if stringStartsWith(t.String(), prefix) {
 					types = append(types, t)
 				}
 			}
@@ -34,9 +36,7 @@ func Types(all bool) []reflect.Type {
 
 	return types
 }
-func pkgName(skip int) string {
-	_, filename, _, ok := runtime.Caller(skip + 1)
-	if !ok { panic("could not detect filename") }
+func pkgName(filename string) string {
 	file, err := parser.ParseFile(token.NewFileSet(), filename, nil, parser.PackageClauseOnly)
 	PanicIf(err)
 	return file.Name.Name

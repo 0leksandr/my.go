@@ -2,12 +2,37 @@ package my
 
 import (
 	"fmt"
+	"github.com/google/go-cmp/cmp"
 	"reflect"
+	"sync"
 	"testing"
 )
 
 func AreEqual(a interface{}, b interface{}) bool {
-	return reflect.DeepEqual(a, b)
+	//return reflect.DeepEqual(a, b)
+
+	var localTypesInterfaces []interface{}
+	var isStruct func(reflect.Type) bool
+	isStruct = func(_type reflect.Type) bool {
+		switch _type.Kind() {
+			case reflect.Struct: return true
+			case reflect.Ptr:    return isStruct(_type.Elem())
+			default:             return false
+		}
+	}
+	for _, _type := range getTypes(pkgName(Trace{}.New().SkipFile(1)[0].File) + ".") {
+		if isStruct(_type) {
+			localTypesInterfaces = append(localTypesInterfaces, reflect.Zero(_type).Interface())
+		}
+	}
+	//goland:noinspection GoVetCopyLock
+	return cmp.Equal(
+		a,
+		b,
+		cmp.Comparer(func(a, b error) bool { return a.Error() == b.Error() }),
+		cmp.Comparer(func(_, _ sync.Mutex) bool { return true }),
+		cmp.AllowUnexported(localTypesInterfaces...),
+	)
 }
 func Fail(t *testing.T, context ...interface{}) {
 	fmt.Println(Trace{}.New().SkipFile(1)[0])

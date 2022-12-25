@@ -110,8 +110,7 @@ func TestDummyMap(t *testing.T) {
 	)
 }
 func TestTypes(t *testing.T) {
-	AssertEquals(
-		t,
+	if !reflect.DeepEqual( // MAYBE: fix and use `AssertEquals`
 		Types(false),
 		[]reflect.Type{
 			reflect.TypeOf(Error{}),
@@ -129,7 +128,9 @@ func TestTypes(t *testing.T) {
 			reflect.TypeOf((*ParsedType)(nil)).Elem(),
 			reflect.TypeOf(Trace{}),
 		},
-	)
+	) {
+		Fail(t)
+	}
 }
 func TestParseTypes(t *testing.T) {
 	parsed := ParseTypes()
@@ -339,8 +340,8 @@ func TestError(t *testing.T) {
 		Error{
 			error: errors.New("test"),
 			trace: Trace{
-				{"my_test.go", 334},
-				{"my_test.go", 338},
+				{"my_test.go", 335},
+				{"my_test.go", 339},
 			},
 		},
 	)
