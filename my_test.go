@@ -110,8 +110,9 @@ func TestDummyMap(t *testing.T) {
 	)
 }
 func TestTypes(t *testing.T) {
+	types := Types(false)
 	if !reflect.DeepEqual( // MAYBE: fix and use `AssertEquals`
-		Types(false),
+		types,
 		[]reflect.Type{
 			reflect.TypeOf(Error{}),
 			reflect.TypeOf(Frame{}),
@@ -126,10 +127,12 @@ func TestTypes(t *testing.T) {
 			reflect.TypeOf(ParsedPackage{}),
 			reflect.TypeOf(ParsedStruct{}),
 			reflect.TypeOf((*ParsedType)(nil)).Elem(),
+			reflect.TypeOf(TestTrend{}),
 			reflect.TypeOf(Trace{}),
+			reflect.TypeOf((*Trend)(nil)).Elem(),
 		},
 	) {
-		Fail(t)
+		Fail(t, types)
 	}
 }
 func TestParseTypes(t *testing.T) {
@@ -331,6 +334,7 @@ func TestOrderedMap(t *testing.T) {
 	AssertEquals(t, key1, "value3")
 }
 func TestError(t *testing.T) {
+	const thisLine = 337
 	f := func() error {
 		return Error{}.New("test")
 	}
@@ -340,8 +344,8 @@ func TestError(t *testing.T) {
 		Error{
 			error: errors.New("test"),
 			trace: Trace{
-				{"my_test.go", 335},
-				{"my_test.go", 339},
+				{"my_test.go", thisLine + 2},
+				{"my_test.go", thisLine + 6},
 			},
 		},
 	)
@@ -349,6 +353,41 @@ func TestError(t *testing.T) {
 func TestProgressBar(t *testing.T) {
 	if false {
 		testProgress()
+	}
+}
+func TestTopChart(t *testing.T) {
+	for _, testCase := range[][]struct{i int; expected []int}{
+		{
+			{1, []int{1}},
+			{2, []int{2, 1}},
+			{3, []int{3, 2, 1}},
+			{4, []int{4, 3, 2}},
+			{5, []int{5, 4, 3}},
+		},
+		{
+			{5, []int{5}},
+			{4, []int{5, 4}},
+			{3, []int{5, 4, 3}},
+			{2, []int{5, 4, 3}},
+			{1, []int{5, 4, 3}},
+		},
+		{
+			{3, []int{3}},
+			{1, []int{3, 1}},
+			{4, []int{4, 3, 1}},
+			{2, []int{4, 3, 2}},
+			{5, []int{5, 4, 3}},
+		},
+	} {
+		topChart := (*TopChart)(nil).OfConstSize(3)
+		for _, testCase2 := range testCase {
+			topChart.Add(TestTrend{testCase2.i})
+			actual := make([]int, 0, 3)
+			for _, trend := range topChart.Trends {
+				actual = append(actual, trend.(TestTrend).value)
+			}
+			AssertEquals(t, actual, testCase2.expected)
+		}
 	}
 }
 
@@ -359,3 +398,10 @@ type TestType1 struct { TestInterface }
 type TestType2 struct { TestInterface }
 func (t TestType2) TestMethod() {}
 func (t TestType2) testMethod2() bool { return true }
+
+type TestTrend struct {
+	value int
+}
+func (trend TestTrend) TrendValue() float64 {
+	return float64(trend.value)
+}

@@ -3,12 +3,13 @@ package my
 import (
 	"fmt"
 	"github.com/google/go-cmp/cmp"
+	"math"
 	"reflect"
 	"sync"
 	"testing"
 )
 
-func AreEqual(a interface{}, b interface{}) bool {
+func areEqual(a, b interface{}, opts ...cmp.Option) bool {
 	//return reflect.DeepEqual(a, b)
 
 	var localTypesInterfaces []interface{}
@@ -26,13 +27,13 @@ func AreEqual(a interface{}, b interface{}) bool {
 		}
 	}
 	//goland:noinspection GoVetCopyLock
-	return cmp.Equal(
-		a,
-		b,
+	opts = append(
+		opts,
 		cmp.Comparer(func(a, b error) bool { return a.Error() == b.Error() }),
 		cmp.Comparer(func(_, _ sync.Mutex) bool { return true }),
 		cmp.AllowUnexported(localTypesInterfaces...),
 	)
+	return cmp.Equal(a, b, opts...)
 }
 func Fail(t *testing.T, context ...interface{}) {
 	fmt.Println(Trace{}.New().SkipFile(1)[0])
@@ -49,8 +50,21 @@ func Assert(t *testing.T, statement bool, context ...interface{}) {
 }
 func AssertEquals(t *testing.T, a interface{}, b interface{}, context ...interface{}) {
 	args := append([]interface{}{"vars are not equal", a, b}, context...)
-	if !AreEqual(a, b) { Fail(t, args...) }
+	if !areEqual(a, b) { Fail(t, args...) }
 }
 func AssertNotEqual(t *testing.T, a interface{}, b interface{}) {
-	if AreEqual(a, b) { Fail(t, "vars are equal", a, b) }
+	if areEqual(a, b) { Fail(t, "vars are equal", a, b) }
+}
+func ApproxEqual(a, b interface{}) bool {
+	return areEqual(
+		a,
+		b,
+		cmp.Comparer(func(a, b float32) bool { return floatsEqual(float64(a), float64(b), 1e-7) }),
+		cmp.Comparer(func(a, b float64) bool { return floatsEqual(a, b, 1e-14) }),
+	)
+}
+
+func floatsEqual(a, b, epsilon float64) bool {
+	if b == 0 { return a == 0 }
+	return math.Abs(1. - a / b) < epsilon
 }
