@@ -26,21 +26,17 @@ func (topChart *TopChart) Add(trend Trend) {
 	fitsIn := topChart.fitsIn(topChart.Trends, trend)
 	l := len(topChart.Trends)
 	if fitsIn || l == 0 || trend.TrendValue() > topChart.Trends[l - 1].TrendValue() {
-		position := 0
-		for _, existingTrend := range topChart.Trends {
-			if trend.TrendValue() <= existingTrend.TrendValue() {
-				position++
+		position := len(topChart.Trends)
+		for position > 0 {
+			if trend.TrendValue() > topChart.Trends[position - 1].TrendValue() {
+				position--
 			} else {
 				break
 			}
 		}
 
-		newLen := len(topChart.Trends)
-		if fitsIn { newLen++ }
-		trends := make([]Trend, 0, newLen)
-		trends = append(trends, topChart.Trends[:position]...)
-		trends = append(trends, trend)
-		trends = append(trends, topChart.Trends[position : newLen-1]...)
-		topChart.Trends = trends
+		if fitsIn { topChart.Trends = append(topChart.Trends, Trend(nil)) }
+		copy(topChart.Trends[position+1:], topChart.Trends[position:])
+		topChart.Trends[position] = trend
 	}
 }
