@@ -7,6 +7,7 @@ import (
 	"reflect"
 	"sync"
 	"testing"
+	"time"
 )
 
 func areEqual(a, b interface{}, opts ...cmp.Option) bool {
@@ -31,6 +32,7 @@ func areEqual(a, b interface{}, opts ...cmp.Option) bool {
 		opts,
 		cmp.Comparer(func(a, b error) bool { return a.Error() == b.Error() }),
 		cmp.Comparer(func(_, _ sync.Mutex) bool { return true }),
+		cmp.Comparer(func(a, b time.Time) bool { return a.Round(time.Duration(0)) == b.Round(time.Duration(0)) }),
 		cmp.AllowUnexported(localTypesInterfaces...),
 	)
 	return cmp.Equal(a, b, opts...)
@@ -62,6 +64,19 @@ func ApproxEqual(a, b interface{}) bool {
 		cmp.Comparer(func(a, b float32) bool { return floatsEqual(float64(a), float64(b), 1e-7) }),
 		cmp.Comparer(func(a, b float64) bool { return floatsEqual(a, b, 1e-14) }),
 	)
+}
+
+func TestTypes(t *testing.T) {
+	parsedPackage := parseTypes(1)
+	for structName, parsedStruct := range parsedPackage.structs {
+		for _, embeddedName := range parsedStruct.embedded {
+			if embeddedStruct, ok := parsedPackage.structs[embeddedName]; ok {
+				if !parsedStruct.Overrides(embeddedStruct) {
+					Fail(t, "struct does not override", structName, embeddedName)
+				}
+			}
+		}
+	}
 }
 
 func floatsEqual(a, b, epsilon float64) bool {

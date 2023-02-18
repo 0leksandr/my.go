@@ -22,14 +22,31 @@ func (parsedPackage ParsedPackage) Interfaces() map[string]ParsedInterface {
 }
 
 type ParsedStruct struct {
-	methods map[string]ParsedFuncType
+	embedded []string
+	methods  map[string]ParsedFuncType
 }
-func (parsedStruct ParsedStruct) Implements(parsedInterface ParsedInterface) bool {
+func (parsedStruct ParsedStruct) Implements(parsedInterface ParsedInterface) bool { // MAYBE: remove
 	for methodName, interfaceMethod := range parsedInterface.methods {
 		if structMethod, ok := parsedStruct.methods[methodName]; ok {
 			if !structMethod.SignatureEquals(interfaceMethod) { return false }
 		} else {
 			return false
+		}
+	}
+	return true
+}
+func (parsedStruct ParsedStruct) Overrides(other ParsedStruct) bool { // MAYBE: rename
+	ignoredMethods := [...]string{"New"}
+
+	for methodName, otherMethod := range other.methods {
+		if !InArray(methodName, ignoredMethods) {
+			if thisMethod, ok := parsedStruct.methods[methodName]; ok {
+				if !thisMethod.SignatureEquals(otherMethod) {
+					return false
+				}
+			} else {
+				return false
+			}
 		}
 	}
 	return true
@@ -141,7 +158,10 @@ func (parsedEllipsisType ParsedEllipsisType) Equals(other ParsedType) bool {
 }
 
 func ParseTypes() ParsedPackage {
-	_, file, _, okCaller := runtime.Caller(1)
+	return parseTypes(1)
+}
+func parseTypes(skip int) ParsedPackage {
+	_, file, _, okCaller := runtime.Caller(skip + 1)
 	if !okCaller { panic(nil) }
 	dir := path.Dir(file)
 	if false { panic(dir) }
@@ -196,46 +216,55 @@ func ParseTypes() ParsedPackage {
 		//	}
 		//}
 
-		for _, astFile := range astPkg.Files {
-			for _, decl := range astFile.Decls {
-				if genDecl, isGenDecl := decl.(*ast.GenDecl); isGenDecl {
-					for _, spec := range genDecl.Specs {
-						if typeSpec, isTypeSpec := spec.(*ast.TypeSpec); isTypeSpec {
-							specName := typeSpec.Name.Name
-							astType := typeSpec.Type
-							if _, isStructType := astType.(*ast.StructType); isStructType {
-								parsedStructs[specName] = ParsedStruct{methods: make(map[string]ParsedFuncType)}
-							}
-							if astInterfaceType, isInterfaceType := astType.(*ast.InterfaceType); isInterfaceType {
-								parsedInterfaces[specName] = parseInterface(astInterfaceType)
-							}
-						}
-					}
+		walkDecls := func(f func(ast.Decl)) {
+			for _, astFile := range astPkg.Files {
+				for _, decl := range astFile.Decls {
+					f(decl)
 				}
 			}
 		}
-		for _, astFile := range astPkg.Files {
-			for _, decl := range astFile.Decls {
-
-				if funcDecl, isFuncDecl := decl.(*ast.FuncDecl); isFuncDecl {
-					if receivers := funcDecl.Recv; receivers != nil {
-						if len(receivers.List) == 1 {
-							receiverAstField := receivers.List[0]
-							receiverType := receiverAstField.Type
-							if starExpr, isStarExpr := receiverType.(*ast.StarExpr); isStarExpr {
-								receiverType = starExpr.X
-							}
-							if ident, isIdent := receiverType.(*ast.Ident); isIdent {
-								receiverName := ident.Name
-								if _, structExists := parsedStructs[receiverName]; structExists {
-									parsedStructs[receiverName].methods[funcDecl.Name.Name] = parseFunc(funcDecl.Type)
+		walkDecls(func(decl ast.Decl) {
+			if genDecl, isGenDecl := decl.(*ast.GenDecl); isGenDecl {
+				for _, spec := range genDecl.Specs {
+					if typeSpec, isTypeSpec := spec.(*ast.TypeSpec); isTypeSpec {
+						specName := typeSpec.Name.Name
+						astType := typeSpec.Type
+						if astStructType, isStructType := astType.(*ast.StructType); isStructType {
+							parsedStruct := ParsedStruct{methods: make(map[string]ParsedFuncType)}
+							for _, field := range astStructType.Fields.List {
+								if field.Names == nil {
+									if astIdent, isIdent := field.Type.(*ast.Ident); isIdent {
+										parsedStruct.embedded = append(parsedStruct.embedded, astIdent.Name)
+									}
 								}
 							}
+							parsedStructs[specName] = parsedStruct
+						} else if astInterfaceType, isInterfaceType := astType.(*ast.InterfaceType); isInterfaceType {
+							parsedInterfaces[specName] = parseInterface(astInterfaceType)
 						}
 					}
 				}
 			}
-		}
+		})
+		walkDecls(func(decl ast.Decl) {
+			if funcDecl, isFuncDecl := decl.(*ast.FuncDecl); isFuncDecl {
+				if receivers := funcDecl.Recv; receivers != nil {
+					if len(receivers.List) == 1 {
+						receiverAstField := receivers.List[0]
+						receiverType := receiverAstField.Type
+						if starExpr, isStarExpr := receiverType.(*ast.StarExpr); isStarExpr {
+							receiverType = starExpr.X
+						}
+						if ident, isIdent := receiverType.(*ast.Ident); isIdent {
+							receiverName := ident.Name
+							if _, structExists := parsedStructs[receiverName]; structExists {
+								parsedStructs[receiverName].methods[funcDecl.Name.Name] = parseFunc(funcDecl.Type)
+							}
+						}
+					}
+				}
+			}
+		})
 	}
 
 	return ParsedPackage{

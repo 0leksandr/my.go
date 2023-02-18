@@ -19,8 +19,8 @@ type ProgressBar struct {
 	mutex         *sync.Mutex
 }
 
-func (ProgressBar) New(description string, totalSteps int64) ProgressBar {
-	bar := ProgressBar{
+func (*ProgressBar) New(description string, totalSteps int64) *ProgressBar {
+	bar := &ProgressBar{
 		description: description,
 		total:       totalSteps,
 		current:     0,
@@ -45,7 +45,7 @@ func (bar *ProgressBar) UpdateTotal(total int64) {
 	bar.total = total
 	bar.updated()
 }
-func (ProgressBar) FmtDuration(duration time.Duration) string {
+func (*ProgressBar) FmtDuration(duration time.Duration) string {
 	return regexp.
 		MustCompile("^([^.]+\\.\\d{2})\\d*([^0-9]+)$").
 		ReplaceAllString(duration.String(), "$1$2")
@@ -90,10 +90,10 @@ func (bar *ProgressBar) print(postfix string, newLine bool) {
 	fmt.Print("\r" + _bar)
 	bar.lastPrint = time.Now()
 }
-func (bar ProgressBar) nrNotches() int {
+func (bar *ProgressBar) nrNotches() int {
 	return int(float64(bar.current) * float64(bar.width) / float64(bar.total))
 }
-func (bar ProgressBar) estimateLeft() time.Duration {
+func (bar *ProgressBar) estimateLeft() time.Duration {
 	return time.Duration(
 		float64(time.Since(bar.start).Nanoseconds()) * float64(bar.total - bar.current) / float64(bar.current),
 	)
@@ -114,7 +114,7 @@ func testProgress() {
 		1000000,
 	} {
 		sleep := int64(testCaseDuration) / nrSteps
-		progress := ProgressBar{}.New(fmt.Sprintf("Test %7d", nrSteps), nrSteps)
+		progress := (*ProgressBar)(nil).New(fmt.Sprintf("Test %7d", nrSteps), nrSteps)
 		for c := int64(0); c < nrSteps; c++ {
 			time.Sleep(time.Duration(sleep))
 			progress.Add()

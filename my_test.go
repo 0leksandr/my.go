@@ -3,6 +3,7 @@ package my
 import (
 	"errors"
 	"reflect"
+	"runtime"
 	"testing"
 	"time"
 )
@@ -11,7 +12,8 @@ func TestDump(t *testing.T) {
 	Dump("hi")
 }
 func TestGetTrace(t *testing.T) {
-	AssertEquals(t, GetTrace(false), Trace{{"my_test.go", 14}})
+	_, _, thisLine, _ := runtime.Caller(0)
+	AssertEquals(t, GetTrace(false), Trace{{"my_test.go", thisLine + 1}})
 
 	fullTrace := GetTrace(true)
 	Assert(t, len(fullTrace) == 3, fullTrace)
@@ -109,7 +111,7 @@ func TestDummyMap(t *testing.T) {
 		[]string{},
 	)
 }
-func TestTypes(t *testing.T) {
+func TestRuntimeTypes(t *testing.T) {
 	types := Types(false)
 	if !reflect.DeepEqual( // MAYBE: fix and use `AssertEquals`
 		types,
@@ -153,13 +155,15 @@ func TestParseTypes(t *testing.T) {
 		t,
 		testType1,
 		ParsedStruct{
-			methods: map[string]ParsedFuncType{},
+			embedded: []string{"TestInterface"},
+			methods:  map[string]ParsedFuncType{},
 		},
 	)
 	AssertEquals(
 		t,
 		testType2,
 		ParsedStruct{
+			embedded: []string{"TestInterface"},
 			methods: map[string]ParsedFuncType{
 				"TestMethod":  {},
 				"testMethod2": {out: []ParsedType{ParsedNamedType{"bool"}}},
@@ -334,7 +338,7 @@ func TestOrderedMap(t *testing.T) {
 	AssertEquals(t, key1, "value3")
 }
 func TestError(t *testing.T) {
-	const thisLine = 337
+	_, _, thisLine, _ := runtime.Caller(0)
 	f := func() error {
 		return Error{}.New("test")
 	}

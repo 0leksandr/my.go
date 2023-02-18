@@ -87,9 +87,9 @@ func (db DB) InsertMany(table string, columns []string, rows [][]interface{}, pr
 	const MaxNrVars = 999
 	batchSize := MaxNrVars / len(columns)
 
-	var progress ProgressBar
+	var progress *ProgressBar
 	if progressMessage != "" {
-		progress = ProgressBar{}.New(progressMessage, int64(math.Ceil(float64(len(rows)) / float64(batchSize))))
+		progress = (*ProgressBar)(nil).New(progressMessage, int64(math.Ceil(float64(len(rows)) / float64(batchSize))))
 	}
 
 	for len(rows) > 0 {
