@@ -58,23 +58,22 @@ func TestPanicIf(t *testing.T) {
 	}
 }
 func TestRevert(t *testing.T) {
-	AssertEquals(t, Revert([]int{1, 2, 3, 4}).([]int), []int{4, 3, 2, 1})
+	AssertEquals(t, Revert([]int{1, 2, 3, 4}), []int{4, 3, 2, 1})
 }
 func TestRemove(t *testing.T) {
 	slice := []int{1, 2, 3, 4}
-	slice = Remove(slice, 2).([]int)
+	slice = Remove(slice, 2)
 	AssertEquals(t, slice, []int{1, 2, 4})
-	slice = Remove(slice, 2).([]int)
+	slice = Remove(slice, 2)
 	AssertEquals(t, slice, []int{1, 2})
-	slice = Remove(slice, 0).([]int)
+	slice = Remove(slice, 0)
 	AssertEquals(t, slice, []int{2})
-	slice = Remove(slice, 0).([]int)
+	slice = Remove(slice, 0)
 	AssertEquals(t, slice, []int{})
 }
 func TestInArray(t *testing.T) {
 	Assert(t, InArray(3, []int{1, 2, 3}))
 	Assert(t, !InArray("3", []string{"1", "2"}))
-	//InArray("1", []int{1, 2, 3})
 }
 func TestDummyMap(t *testing.T) {
 	m := DummyMap{}

@@ -36,7 +36,7 @@ func (parsedStruct ParsedStruct) Implements(parsedInterface ParsedInterface) boo
 	return true
 }
 func (parsedStruct ParsedStruct) Overrides(other ParsedStruct) bool { // MAYBE: rename
-	ignoredMethods := [...]string{"New"}
+	ignoredMethods := []string{"New"}
 
 	for methodName, otherMethod := range other.methods {
 		if !InArray(methodName, ignoredMethods) {
