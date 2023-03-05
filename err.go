@@ -29,8 +29,25 @@ func (Error) New(text string) Error {
 		trace: Trace{}.New().SkipFile(1).Local(),
 	}
 }
+func (Error) Wrap(other error) Error {
+	return Error{
+		error: other,
+		trace: Trace{}.New().SkipFile(1).Local(),
+	}
+}
 func (error Error) Error() string {
 	trace := make([]string, 0, len(error.trace))
 	for _, frame := range error.trace { trace = append(trace, "- " + frame.String()) }
 	return error.error.Error() + "\nTrace:\n" + strings.Join(trace, "\n")
+}
+func (error Error) Unwrap() error {
+	return error.error
+}
+func (error Error) Is(other error) bool {
+	if otherError, ok := other.(Error); ok {
+		return errors.Is(error.error, otherError.error) &&
+			areEqual(error.trace, otherError.trace)
+	} else {
+		return false
+	}
 }

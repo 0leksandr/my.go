@@ -354,6 +354,40 @@ func TestError(t *testing.T) {
 		},
 	)
 }
+func TestError_WrapUnwrap(t *testing.T) {
+	for _, underlying := range [][2]error{
+		{
+			errors.New("testA"),
+			errors.New("testB"),
+		},
+		{
+			Error{}.New("testA"),
+			Error{}.New("testB"),
+		},
+	} {
+		testA := underlying[0]
+		testB := underlying[1]
+		error1A := Error{}.Wrap(testA)
+		error2A := Error{}.Wrap(testA)
+		error3B := Error{}.Wrap(testB)
+
+		Assert(t, errors.Is(error1A, testA))
+		Assert(t, errors.Is(error2A, testA))
+		Assert(t, errors.Is(error3B, testB))
+		Assert(t, !errors.Is(error1A, testB))
+		Assert(t, !errors.Is(error2A, testB))
+		Assert(t, !errors.Is(error3B, testA))
+
+		for _, pair := range [][2]Error{
+			{error1A, error2A},
+			{error1A, error3B},
+			{error2A, error3B},
+		} {
+			Assert(t, !errors.Is(pair[0], pair[1]))
+			Assert(t, !errors.Is(pair[1], pair[0]))
+		}
+	}
+}
 func TestProgressBar(t *testing.T) {
 	if false {
 		testProgress()

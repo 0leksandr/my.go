@@ -4,18 +4,23 @@ import (
 	"database/sql"
 	"fmt"
 	_ "github.com/mattn/go-sqlite3"
+	"io"
 	"math"
 	"regexp"
 	"strings"
 )
 
 type DB struct {
+	io.Closer
 	db *sql.DB
 }
 func (DB) New(path string) DB {
 	db, err := sql.Open("sqlite3", path)
 	PanicIf(err)
-	return DB{db}
+	return DB{db: db}
+}
+func (db DB) Close() error {
+	return db.db.Close()
 }
 func (db DB) SelectOne(query string, params []interface{}, values ...interface{}) bool {
 	rows, err := db.db.Query(query, params...)

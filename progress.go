@@ -18,7 +18,6 @@ type ProgressBar struct {
 	lastPrint     time.Time
 	mutex         *sync.Mutex
 }
-
 func (*ProgressBar) New(description string, totalSteps int64) *ProgressBar {
 	bar := &ProgressBar{
 		description: description,
@@ -45,6 +44,11 @@ func (bar *ProgressBar) UpdateTotal(total int64) {
 	bar.total = total
 	bar.updated()
 }
+func (bar *ProgressBar) Reset(current, total int64) {
+	bar.current = current
+	bar.total = total
+	bar.updated()
+}
 func (*ProgressBar) FmtDuration(duration time.Duration) string {
 	return regexp.
 		MustCompile("^([^.]+\\.\\d{2})\\d*([^0-9]+)$").
@@ -55,7 +59,7 @@ func (bar *ProgressBar) updated() {
 
 	if bar.current >= bar.total {
 		bar.print(bar.FmtDuration(time.Since(bar.start)), true)
-	} else if (nrNotches > bar.prevNrNotches) || (time.Since(bar.lastPrint) > 5 * time.Second) {
+	} else if (nrNotches != bar.prevNrNotches) || (time.Since(bar.lastPrint) > 5 * time.Second) {
 		bar.print(
 			fmt.Sprintf(
 				"%d%% ≈%s",
