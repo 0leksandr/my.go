@@ -4,6 +4,7 @@ import (
 	"errors"
 	"reflect"
 	"runtime"
+	"sort"
 	"testing"
 	"time"
 )
@@ -74,6 +75,13 @@ func TestRemove(t *testing.T) {
 func TestInArray(t *testing.T) {
 	Assert(t, InArray(3, []int{1, 2, 3}))
 	Assert(t, !InArray("3", []string{"1", "2"}))
+}
+func TestKeys(t *testing.T) {
+	actualKeys := Keys(map[string]int{"one": 1, "two": 2, "three": 3})
+	expectedKeys := []string{"one", "two", "three"}
+	sort.Strings(actualKeys)
+	sort.Strings(expectedKeys)
+	AssertEquals(t, actualKeys, expectedKeys)
 }
 func TestDummyMap(t *testing.T) {
 	m := DummyMap{}
