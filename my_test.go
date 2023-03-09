@@ -84,13 +84,13 @@ func TestKeys(t *testing.T) {
 	AssertEquals(t, actualKeys, expectedKeys)
 }
 func TestDummyMap(t *testing.T) {
-	m := DummyMap{}
+	m := DummyMap[string, string]{}
 	Assert(t, !m.Has("test"))
 	Assert(t, m.Len() == 0)
 	if _, ok := m.Get("test"); ok { t.Fail() }
 	AssertEquals(
 		t,
-		m.Arr(reflect.TypeOf([]string{})),
+		m.Arr(),
 		[]string{},
 	)
 
@@ -104,7 +104,7 @@ func TestDummyMap(t *testing.T) {
 	})()
 	AssertEquals(
 		t,
-		m.Arr(reflect.TypeOf([]string{})),
+		m.Arr(),
 		[]string{"a test"},
 	)
 
@@ -114,7 +114,7 @@ func TestDummyMap(t *testing.T) {
 	if _, ok := m.Get("test"); ok { t.Fail() }
 	AssertEquals(
 		t,
-		m.Arr(reflect.TypeOf([]string{})),
+		m.Arr(),
 		[]string{},
 	)
 }
