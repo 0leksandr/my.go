@@ -9,6 +9,8 @@ import (
 	"time"
 )
 
+var extraTypes []reflect.Type
+
 func TestDump(t *testing.T) {
 	Dump("hi")
 }
@@ -134,32 +136,6 @@ func TestDummyMap(t *testing.T) {
 		[]string{},
 	)
 }
-func TestRuntimeTypes(t *testing.T) {
-	types := Types(false)
-	if !reflect.DeepEqual( // MAYBE: fix and use `AssertEquals`
-		types,
-		[]reflect.Type{
-			reflect.TypeOf(DummyMap[string, string]{}),
-			reflect.TypeOf(Error{}),
-			reflect.TypeOf(Frame{}),
-			reflect.TypeOf(ParsedArrayType{}),
-			reflect.TypeOf(ParsedChanType{}),
-			reflect.TypeOf(ParsedEllipsisType{}),
-			reflect.TypeOf(ParsedFuncType{}),
-			reflect.TypeOf(ParsedInterface{}),
-			reflect.TypeOf(ParsedMapType{}),
-			reflect.TypeOf(ParsedNamedType{}),
-			reflect.TypeOf(ParsedPackage{}),
-			reflect.TypeOf(ParsedStruct{}),
-			reflect.TypeOf((*ParsedType)(nil)).Elem(),
-			reflect.TypeOf(TestTrend{}),
-			reflect.TypeOf(Trace{}),
-			reflect.TypeOf((*Trend)(nil)).Elem(),
-		},
-	) {
-		Fail(t, types)
-	}
-}
 func TestParseTypes(t *testing.T) {
 	parsed := ParseTypes()
 	testInterface := parsed.Interfaces()["TestInterface"]
@@ -231,6 +207,12 @@ func TestStartCommand(t *testing.T) {
 func TestOrderedMap(t *testing.T) {
 	type K string
 	type V string
+	extraTypes = append(extraTypes,
+		reflect.TypeOf(K("")),
+		reflect.TypeOf(V("")),
+		reflect.TypeOf(OrderedMap[K, V]{}),
+		reflect.TypeOf(OrderedMapPair[K, V]{}),
+	)
 	type Pair struct{k K; v V}
 	m := OrderedMap[K, V]{}.New()
 	assertMap := func(
@@ -459,6 +441,42 @@ func TestTopChart(t *testing.T) {
 			}
 			AssertEquals(t, actual, testCase2.expected)
 		}
+	}
+}
+func TestRuntimeTypes(t *testing.T) {
+	expectedTypes := append(
+		[]reflect.Type{
+			reflect.TypeOf(DummyMap[string, string]{}),
+			reflect.TypeOf(Error{}),
+			reflect.TypeOf(Frame{}),
+			reflect.TypeOf(ParsedArrayType{}),
+			reflect.TypeOf(ParsedChanType{}),
+			reflect.TypeOf(ParsedEllipsisType{}),
+			reflect.TypeOf(ParsedFuncType{}),
+			reflect.TypeOf(ParsedInterface{}),
+			reflect.TypeOf(ParsedMapType{}),
+			reflect.TypeOf(ParsedNamedType{}),
+			reflect.TypeOf(ParsedPackage{}),
+			reflect.TypeOf(ParsedStruct{}),
+			reflect.TypeOf((*ParsedType)(nil)).Elem(),
+			reflect.TypeOf(TestTrend{}),
+			reflect.TypeOf(Trace{}),
+			reflect.TypeOf((*Trend)(nil)).Elem(),
+		},
+		extraTypes...,
+	)
+	{ // sort expected types
+		typesMap := make(map[string]reflect.Type, len(expectedTypes))
+		for _, _type := range expectedTypes { typesMap[_type.String()] = _type }
+		typeNames := Keys(typesMap)
+		sort.Strings(typeNames)
+		var expectedSorted []reflect.Type
+		for _, name := range typeNames { expectedSorted = append(expectedSorted, typesMap[name]) }
+		expectedTypes = expectedSorted
+	}
+	actualTypes := Types(false)
+	if !reflect.DeepEqual(actualTypes, expectedTypes) { // MAYBE: fix and use `AssertEquals`
+		Fail(t, actualTypes)
 	}
 }
 
