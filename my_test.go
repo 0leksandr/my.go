@@ -83,6 +83,22 @@ func TestKeys(t *testing.T) {
 	sort.Strings(expectedKeys)
 	AssertEquals(t, actualKeys, expectedKeys)
 }
+func TestArrayFilter(t *testing.T) {
+	AssertEquals(
+		t,
+		ArrayFilter([]int{1, 2, 3, 4, 5, 6}, func(i int) bool {
+			return i % 2 == 1
+		}),
+		[]int{1, 3, 5},
+	)
+}
+func TestArrayMap(t *testing.T) {
+	AssertEquals(
+		t,
+		ArrayMap([]string{"one", "two", "three"}, func(s string) string { return "[" + s + "]" }),
+		[]string{"[one]", "[two]", "[three]"},
+	)
+}
 func TestDummyMap(t *testing.T) {
 	m := DummyMap[string, string]{}
 	Assert(t, !m.Has("test"))
@@ -123,9 +139,9 @@ func TestRuntimeTypes(t *testing.T) {
 	if !reflect.DeepEqual( // MAYBE: fix and use `AssertEquals`
 		types,
 		[]reflect.Type{
+			reflect.TypeOf(DummyMap[string, string]{}),
 			reflect.TypeOf(Error{}),
 			reflect.TypeOf(Frame{}),
-			reflect.TypeOf(OrderedMapPair{}),
 			reflect.TypeOf(ParsedArrayType{}),
 			reflect.TypeOf(ParsedChanType{}),
 			reflect.TypeOf(ParsedEllipsisType{}),
@@ -213,19 +229,29 @@ func TestStartCommand(t *testing.T) {
 	}
 }
 func TestOrderedMap(t *testing.T) {
-	m := OrderedMap{}.New()
-	assertMap := func(m OrderedMap, lenKeys, lenValues, lenIndices, lenDeletedIndices int, values [][2]string) {
+	type K string
+	type V string
+	type Pair struct{k K; v V}
+	m := OrderedMap[K, V]{}.New()
+	assertMap := func(
+		m OrderedMap[K, V],
+		lenKeys,
+		lenValues,
+		lenIndices,
+		lenDeletedIndices int,
+		values []Pair,
+	) {
 		Assert(t, len(m.keys) == lenKeys)
 		Assert(t, len(m.values) == lenValues)
 		Assert(t, len(m.indices) == lenIndices)
 		Assert(t, len(m.deletedIndices) == lenDeletedIndices)
-		assertValues := func(m OrderedMap) {
+		assertValues := func(m OrderedMap[K, V]) {
 			var index int
-			m.Each(func(key interface{}, value interface{}) {
+			m.Each(func(key K, value V) {
 				row := values[index]
 				index++
-				AssertEquals(t, key, row[0])
-				AssertEquals(t, value, row[1])
+				AssertEquals(t, key, row.k)
+				AssertEquals(t, value, row.v)
 			})
 		}
 		assertValues(m)
@@ -238,7 +264,7 @@ func TestOrderedMap(t *testing.T) {
 		Assert(t, len(c.deletedIndices) == 0)
 		assertValues(c)
 	}
-	assertMap(m, 0, 0, 0, 0, [][2]string{})
+	assertMap(m, 0, 0, 0, 0, []Pair{})
 	m.Add("key1", "value1")
 	m.Add("key2", "value2")
 	m.Add("key3", "value3")
@@ -246,7 +272,7 @@ func TestOrderedMap(t *testing.T) {
 	m.Add("key5", "value5")
 	m.Add("key6", "value6")
 	m.Add("key7", "value7")
-	assertMap(m, 7, 7, 7, 0, [][2]string{
+	assertMap(m, 7, 7, 7, 0, []Pair{
 		{"key1", "value1"},
 		{"key2", "value2"},
 		{"key3", "value3"},
@@ -258,7 +284,7 @@ func TestOrderedMap(t *testing.T) {
 	AssertEquals(
 		t,
 		m.Pairs(),
-		[]OrderedMapPair{
+		[]OrderedMapPair[K, V]{
 			{"key1", "value1"},
 			{"key2", "value2"},
 			{"key3", "value3"},
@@ -269,7 +295,7 @@ func TestOrderedMap(t *testing.T) {
 		},
 	)
 	m.Del("key2")
-	assertMap(m, 7, 7, 6, 1, [][2]string{
+	assertMap(m, 7, 7, 6, 1, []Pair{
 		{"key1", "value1"},
 		{"key3", "value3"},
 		{"key4", "value4"},
@@ -279,7 +305,7 @@ func TestOrderedMap(t *testing.T) {
 	})
 	m.Del("key6")
 	m.Del("key4")
-	assertMap(m, 7, 7, 4, 3, [][2]string{
+	assertMap(m, 7, 7, 4, 3, []Pair{
 		{"key1", "value1"},
 		{"key3", "value3"},
 		{"key5", "value5"},
@@ -288,7 +314,7 @@ func TestOrderedMap(t *testing.T) {
 	AssertEquals(
 		t,
 		m.Pairs(),
-		[]OrderedMapPair{
+		[]OrderedMapPair[K, V]{
 			{"key1", "value1"},
 			{"key3", "value3"},
 			{"key5", "value5"},
@@ -296,7 +322,7 @@ func TestOrderedMap(t *testing.T) {
 		},
 	)
 
-	m2 := OrderedMap{}.New()
+	m2 := OrderedMap[K, V]{}.New()
 	Assert(
 		t,
 		m.Equals(
@@ -307,7 +333,7 @@ func TestOrderedMap(t *testing.T) {
 				Add("key7", "value7"),
 		),
 	)
-	m2 = OrderedMap{}.New()
+	m2 = OrderedMap[K, V]{}.New()
 	Assert(
 		t,
 		!m.Equals(
@@ -320,7 +346,7 @@ func TestOrderedMap(t *testing.T) {
 	)
 
 	m.Del("key7")
-	assertMap(m, 3, 3, 3, 0, [][2]string{
+	assertMap(m, 3, 3, 3, 0, []Pair{
 		{"key1", "value1"},
 		{"key3", "value3"},
 		{"key5", "value5"},
@@ -328,21 +354,21 @@ func TestOrderedMap(t *testing.T) {
 	AssertEquals(
 		t,
 		m.Pairs(),
-		[]OrderedMapPair{
+		[]OrderedMapPair[K, V]{
 			{"key1", "value1"},
 			{"key3", "value3"},
 			{"key5", "value5"},
 		},
 	)
 
-	m3 := OrderedMap{}.New()
+	m3 := OrderedMap[K, V]{}.New()
 	m3.Add("key1", "value1")
 	m3.Add("key2", "value2")
 	m3.Del("key1")
 	m3.Add("key1", "value3")
 	m3.Del("key2")
 	key1, _ := m3.Get("key1")
-	AssertEquals(t, key1, "value3")
+	AssertEquals(t, key1, V("value3"))
 }
 func TestError(t *testing.T) {
 	_, _, thisLine, _ := runtime.Caller(0)
