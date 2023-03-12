@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/google/go-cmp/cmp"
 	"math"
+	"path"
 	"reflect"
 	"sync"
 	"testing"
@@ -40,6 +41,7 @@ func areEqual(a, b interface{}, opts ...cmp.Option) bool {
 func Fail(t *testing.T, context ...interface{}) {
 	fmt.Println(Trace{}.New().SkipFile(1)[0])
 	for _, c := range context { Dump2(c) }
+	Dump2(Trace{}.New().SkipFile(1).Local())
 	if t != nil {
 		t.Fail()
 	} else {
@@ -66,16 +68,48 @@ func ApproxEqual(a, b interface{}) bool {
 	)
 }
 func AssertNil(t *testing.T, value interface{}) {
-	Assert(t, isNil(value))
+	Assert(t, isNil(value), "value is not nil", value)
 }
 
 func TestTypes(t *testing.T) {
-	parsedPackage := parseTypes(1)
+	testTypes(t, nil)
+}
+func testTypes(t *testing.T, ignored []string) {
+	parsedPackage := parseTypes(path.Dir(GetTrace(true).SkipFile(1)[0].File))
+	types := Types(true)
 	for structName, parsedStruct := range parsedPackage.structs {
-		for _, embeddedName := range parsedStruct.embedded {
-			if embeddedStruct, ok := parsedPackage.structs[embeddedName]; ok {
-				if !parsedStruct.Overrides(embeddedStruct) {
-					Fail(t, "struct does not override", structName, embeddedName)
+		if !InArray(structName, ignored) {
+			for _, embeddedName := range parsedStruct.embedded {
+				if embeddedStruct, isLocalStruct := parsedPackage.structs[embeddedName]; isLocalStruct {
+					Assert(
+						t,
+						parsedStruct.Overrides(embeddedStruct),
+						"struct does not override", structName, embeddedName,
+					)
+				} else if embeddedInterface, isLocalInterface := parsedPackage.interfaces[embeddedName]
+					isLocalInterface {
+					Assert(
+						t,
+						parsedStruct.Implements(embeddedInterface),
+						"struct does not implement", structName, embeddedName,
+					)
+				} else {
+					embeddedReal := ArrayFilter(types, func(_type reflect.Type) bool {
+						return _type.String() == embeddedName
+					})
+					if len(embeddedReal) != 1 {
+						panic(fmt.Sprintf(
+							"embedded type not found: %s %s(%d)",
+							structName,
+							embeddedName,
+							len(embeddedReal),
+						))
+					}
+					Assert(
+						t,
+						parsedStruct.ImplementsReal(embeddedReal[0]),
+						"struct does not implement", structName, embeddedName,
+					)
 				}
 			}
 		}

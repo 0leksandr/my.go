@@ -7,7 +7,7 @@ import (
 	"go/token"
 	"io/fs"
 	"path"
-	"runtime"
+	"reflect"
 )
 
 type ParsedPackage struct {
@@ -51,6 +51,19 @@ func (parsedStruct ParsedStruct) Overrides(other ParsedStruct) bool { // MAYBE: 
 	}
 	return true
 }
+func (parsedStruct ParsedStruct) ImplementsReal(_interface reflect.Type) bool {
+	if _interface.Kind() != reflect.Interface { panic("must be an interface") }
+	for i := 0; i < _interface.NumMethod(); i++ {
+		if method := _interface.Method(i); method.IsExported() {
+			if parsedMethod, ok := parsedStruct.methods[method.Name]; ok {
+				if !parsedMethod.SignatureEqualsReal(method) { return false }
+			} else {
+				return false
+			}
+		}
+	}
+	return true
+}
 
 type ParsedFuncType struct {
 	in  []ParsedType
@@ -67,6 +80,9 @@ func (parsedFuncType ParsedFuncType) SignatureEquals(other ParsedFuncType) bool 
 	}
 	return true
 }
+func (parsedFuncType ParsedFuncType) SignatureEqualsReal(method reflect.Method) bool {
+	return parsedFuncType.EqualsReal(method.Type)
+}
 func (parsedFuncType ParsedFuncType) Equals(other ParsedType) bool {
 	if otherParsedFuncType, ok := other.(ParsedFuncType); ok {
 		return parsedFuncType.SignatureEquals(otherParsedFuncType)
@@ -74,9 +90,25 @@ func (parsedFuncType ParsedFuncType) Equals(other ParsedType) bool {
 		return false
 	}
 }
+func (parsedFuncType ParsedFuncType) EqualsReal(t reflect.Type) bool {
+	if t.Kind() == reflect.Func {
+		if len(parsedFuncType.in) != t.NumIn() { return false }
+		if len(parsedFuncType.out) != t.NumOut() { return false }
+		for i, in := range parsedFuncType.in {
+			if !in.EqualsReal(t.In(i)) { return false }
+		}
+		for i, out := range parsedFuncType.out {
+			if !out.EqualsReal(t.Out(i)) { return false }
+		}
+		return true
+	} else {
+		return false
+	}
+}
 
 type ParsedType interface {
-	Equals(other ParsedType) bool
+	Equals(ParsedType) bool
+	EqualsReal(reflect.Type) bool
 }
 
 type ParsedInterface struct {
@@ -97,6 +129,21 @@ func (parsedInterface ParsedInterface) Equals(other ParsedType) bool {
 		return false
 	}
 }
+func (parsedInterface ParsedInterface) EqualsReal(t reflect.Type) bool {
+	if t.Kind() == reflect.Interface {
+		if len(parsedInterface.methods) != t.NumMethod() { return false }
+		for methodName, parsedMethod := range parsedInterface.methods {
+			if otherMethod, ok := t.MethodByName(methodName); ok {
+				if !parsedMethod.SignatureEqualsReal(otherMethod) { return false }
+			} else {
+				return false
+			}
+		}
+		return true
+	} else {
+		return false
+	}
+}
 
 type ParsedNamedType struct {
 	literalName string
@@ -108,6 +155,10 @@ func (parsedNamedType ParsedNamedType) Equals(other ParsedType) bool {
 		return false
 	}
 }
+func (parsedNamedType ParsedNamedType) EqualsReal(t reflect.Type) bool {
+	if parsedNamedType.literalName == "any" { parsedNamedType.literalName = "interface {}" }
+	return t.String() == parsedNamedType.literalName
+}
 
 type ParsedArrayType struct {
 	length      int
@@ -117,6 +168,14 @@ func (parsedArrayType ParsedArrayType) Equals(other ParsedType) bool {
 	if otherParsedArrayType, ok := other.(ParsedArrayType); ok {
 		return parsedArrayType.length == otherParsedArrayType.length &&
 			parsedArrayType.elementType.Equals(otherParsedArrayType.elementType)
+	} else {
+		return false
+	}
+}
+func (parsedArrayType ParsedArrayType) EqualsReal(t reflect.Type) bool {
+	if t.Kind() == reflect.Array {
+		return parsedArrayType.length == t.Len() &&
+			parsedArrayType.elementType.EqualsReal(t.Elem())
 	} else {
 		return false
 	}
@@ -134,6 +193,14 @@ func (parsedMapType ParsedMapType) Equals(other ParsedType) bool {
 		return false
 	}
 }
+func (parsedMapType ParsedMapType) EqualsReal(t reflect.Type) bool {
+	if t.Kind() == reflect.Map {
+		return parsedMapType.keyType.EqualsReal(t.Key()) &&
+			parsedMapType.elementType.EqualsReal(t.Elem())
+	} else {
+		return false
+	}
+}
 
 type ParsedChanType struct {
 	valueType ParsedType
@@ -141,6 +208,13 @@ type ParsedChanType struct {
 func (parsedChanType ParsedChanType) Equals(other ParsedType) bool {
 	if otherParsedChanType, ok := other.(ParsedChanType); ok {
 		return parsedChanType.valueType.Equals(otherParsedChanType.valueType)
+	} else {
+		return false
+	}
+}
+func (parsedChanType ParsedChanType) EqualsReal(t reflect.Type) bool {
+	if t.Kind() == reflect.Chan {
+		return parsedChanType.valueType.EqualsReal(t.Elem())
 	} else {
 		return false
 	}
@@ -156,16 +230,14 @@ func (parsedEllipsisType ParsedEllipsisType) Equals(other ParsedType) bool {
 		return false
 	}
 }
+func (parsedEllipsisType ParsedEllipsisType) EqualsReal(reflect.Type) bool {
+	return false // TODO: fix
+}
 
 func ParseTypes() ParsedPackage {
-	return parseTypes(1)
+	return parseTypes(path.Dir(GetTrace(true).SkipFile(1)[0].File))
 }
-func parseTypes(skip int) ParsedPackage {
-	_, file, _, okCaller := runtime.Caller(skip + 1)
-	if !okCaller { panic(nil) }
-	dir := path.Dir(file)
-	if false { panic(dir) }
-
+func parseTypes(dir string) ParsedPackage {
 	//_, errImport := importer.Default().Import(dir)
 	//PanicIf(errImport)
 
@@ -233,8 +305,8 @@ func parseTypes(skip int) ParsedPackage {
 							parsedStruct := ParsedStruct{methods: make(map[string]ParsedFuncType)}
 							for _, field := range astStructType.Fields.List {
 								if field.Names == nil {
-									if astIdent, isIdent := field.Type.(*ast.Ident); isIdent {
-										parsedStruct.embedded = append(parsedStruct.embedded, astIdent.Name)
+									if named, ok := parseType(field.Type).(ParsedNamedType); ok {
+										parsedStruct.embedded = append(parsedStruct.embedded, named.literalName)
 									}
 								}
 							}

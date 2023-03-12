@@ -136,9 +136,8 @@ func TestDummyMap(t *testing.T) {
 }
 func TestParseTypes(t *testing.T) {
 	parsed := ParseTypes()
+
 	testInterface := parsed.Interfaces()["TestInterface"]
-	testType1 := parsed.Structs()["TestType1"]
-	testType2 := parsed.Structs()["TestType2"]
 	AssertEquals(
 		t,
 		testInterface,
@@ -148,6 +147,8 @@ func TestParseTypes(t *testing.T) {
 			},
 		},
 	)
+
+	testType1 := parsed.Structs()["TestType1"]
 	AssertEquals(
 		t,
 		testType1,
@@ -156,6 +157,9 @@ func TestParseTypes(t *testing.T) {
 			methods:  map[string]ParsedFuncType{},
 		},
 	)
+	Assert(t, !testType1.Implements(testInterface))
+
+	testType2 := parsed.Structs()["TestType2"]
 	AssertEquals(
 		t,
 		testType2,
@@ -167,11 +171,11 @@ func TestParseTypes(t *testing.T) {
 			},
 		},
 	)
-
-	Assert(t, !testType1.Implements(testInterface))
 	Assert(t, testType2.Implements(testInterface))
 }
 func TestRuntimeTypes(t *testing.T) {
+	actualTypes := Types(false)
+
 	// testing all types this way is inconvenient, because:
 	// - a type might be expected only because it is added here. This is a test, that influences actual code
 	// - some types are hard to add/catch/simulate (`my.OrderedMap[go.shape.string,go.shape.string]`)
@@ -191,10 +195,8 @@ func TestRuntimeTypes(t *testing.T) {
 		reflect.TypeOf(Trace{}),
 		reflect.TypeOf((*Trend)(nil)).Elem(),
 	}
-	actualTypes := Types(false)
-	for _, expectedType := range expectedTypes {
-		Assert(t, InArray(expectedType, actualTypes))
-	}
+	for _, expectedType := range expectedTypes { Assert(t, InArray(expectedType, actualTypes)) }
+
 	AssertEquals(
 		t,
 		ArrayMap(actualTypes, func(t reflect.Type) string { return t.String() }),
@@ -222,8 +224,8 @@ func TestRuntimeTypes(t *testing.T) {
 		},
 	)
 }
-func TestCurrentTypes(t *testing.T) {
-	TestTypes(t)
+func TestLocalTypes(t *testing.T) {
+	testTypes(t, []string{"TestType1"})
 }
 func TestStartCommand(t *testing.T) {
 	outSlice := make([]string, 0)
