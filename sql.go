@@ -22,7 +22,7 @@ func (DB) New(path string) DB {
 func (db DB) Close() error {
 	return db.db.Close()
 }
-func (db DB) SelectOne(query string, params []interface{}, values ...interface{}) bool {
+func (db DB) SelectOne(query string, params []any, values ...any) bool {
 	rows, err := db.db.Query(query, params...)
 	PanicIf(err)
 	defer func() { Must(rows.Close()) }()
@@ -36,9 +36,9 @@ func (db DB) SelectOne(query string, params []interface{}, values ...interface{}
 func (db DB) SelectMany(
 	table string,
 	columns []string,
-	where map[string]interface{},
+	where map[string]any,
 	orderBy []string,
-) []map[string]interface{} {
+) []map[string]any {
 	//goland:noinspection SqlNoDataSourceInspection
 	query := fmt.Sprintf(
 		"SELECT %s FROM %s",
@@ -51,19 +51,19 @@ func (db DB) SelectMany(
 	rows, err := db.db.Query(query, whereValues...)
 	PanicIf(err)
 	defer func() { Must(rows.Close()) }()
-	res := make([]map[string]interface{}, 0)
+	res := make([]map[string]any, 0)
 	for rows.Next() {
-		values := make([]interface{}, 0, len(columns))
-		for range columns { values = append(values, new(interface{})) }
+		values := make([]any, 0, len(columns))
+		for range columns { values = append(values, new(any)) }
 		Must(rows.Scan(values...))
-		valuesCopy := make(map[string]interface{})
-		for index, column := range columns { valuesCopy[column] = *(values[index].(*interface{})) }
+		valuesCopy := make(map[string]any)
+		for index, column := range columns { valuesCopy[column] = *(values[index].(*any)) }
 		res = append(res, valuesCopy)
 	}
 	return res
 }
-func (db DB) Insert(table string, columnValues map[string]interface{}) int64 {
-	values := make([]interface{}, 0, len(columnValues))
+func (db DB) Insert(table string, columnValues map[string]any) int64 {
+	values := make([]any, 0, len(columnValues))
 	insertColumns := make([]string, 0, len(columnValues))
 	insertValues := make([]string, 0, len(columnValues))
 	for column, value := range columnValues {
@@ -88,7 +88,7 @@ func (db DB) Insert(table string, columnValues map[string]interface{}) int64 {
 
 	return id
 }
-func (db DB) InsertMany(table string, columns []string, rows [][]interface{}, progressMessage string) error {
+func (db DB) InsertMany(table string, columns []string, rows [][]any, progressMessage string) error {
 	const MaxNrVars = 999
 	batchSize := MaxNrVars / len(columns)
 
@@ -98,16 +98,16 @@ func (db DB) InsertMany(table string, columns []string, rows [][]interface{}, pr
 	}
 
 	for len(rows) > 0 {
-		var batch [][]interface{}
+		var batch [][]any
 		if len(rows) > batchSize {
 			batch = rows[0:batchSize]
 			rows = rows[batchSize:]
 		} else {
 			batch = rows
-			rows = [][]interface{}{}
+			rows = [][]any{}
 		}
 
-		values := make([]interface{}, 0, len(columns)*len(batch))
+		values := make([]any, 0, len(columns)*len(batch))
 		insertValues := make([]string, 0, len(batch))
 		for _, row := range batch {
 			if len(row) != len(columns) { panic("incorrect nr columns") }
@@ -135,9 +135,9 @@ func (db DB) InsertMany(table string, columns []string, rows [][]interface{}, pr
 	}
 	return nil
 }
-func (db DB) Upsert(table string, columnValues map[string]interface{}) int64 {
+func (db DB) Upsert(table string, columnValues map[string]any) int64 {
 	whereClause := make([]string, 0, len(columnValues))
-	values := make([]interface{}, 0, len(columnValues))
+	values := make([]any, 0, len(columnValues))
 	for column, value := range columnValues {
 		whereClause = append(whereClause, column+" = ?")
 		values = append(values, value)
@@ -154,8 +154,8 @@ func (db DB) Upsert(table string, columnValues map[string]interface{}) int64 {
 	}
 	return db.Insert(table, columnValues)
 }
-func (db DB) Update(table string, where map[string]interface{}, values map[string]interface{}) error {
-	valuesList := make([]interface{}, 0, len(where) + len(values))
+func (db DB) Update(table string, where map[string]any, values map[string]any) error {
+	valuesList := make([]any, 0, len(where) + len(values))
 
 	updateClause := make([]string, 0, len(values))
 	for column, value := range values {
@@ -182,7 +182,7 @@ func (db DB) Update(table string, where map[string]interface{}, values map[strin
 
 	return err
 }
-func (db DB) Delete(table string, where map[string]interface{}) {
+func (db DB) Delete(table string, where map[string]any) {
 	whereClause, values := formatWhere(where)
 	//goland:noinspection SqlNoDataSourceInspection
 	_, err := db.db.Exec(
@@ -192,16 +192,16 @@ func (db DB) Delete(table string, where map[string]interface{}) {
 	PanicIf(err)
 }
 
-func (db DB) Exec(query string, args ...interface{}) (sql.Result, error) {
+func (db DB) Exec(query string, args ...any) (sql.Result, error) {
 	return db.db.Exec(query, args...)
 }
 
-func formatWhere(where map[string]interface{}) (string, []interface{}) {
+func formatWhere(where map[string]any) (string, []any) {
 	var whereStmt string
-	var whereValues []interface{}
+	var whereValues []any
 	if len(where) > 0 {
 		whereColumns := make([]string, 0, len(where))
-		whereValues = make([]interface{}, 0, len(where))
+		whereValues = make([]any, 0, len(where))
 		nonAlphanumeric := regexp.MustCompile("\\W")
 		questionMark := regexp.MustCompile("\\?")
 		for column, value := range where {

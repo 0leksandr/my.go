@@ -11,10 +11,10 @@ import (
 	"time"
 )
 
-func areEqual(a, b interface{}, opts ...cmp.Option) bool {
+func areEqual(a, b any, opts ...cmp.Option) bool {
 	//return reflect.DeepEqual(a, b)
 
-	var localTypesInterfaces []interface{}
+	var localTypesInterfaces []any
 	var isStruct func(reflect.Type) bool
 	isStruct = func(_type reflect.Type) bool {
 		switch _type.Kind() {
@@ -38,7 +38,7 @@ func areEqual(a, b interface{}, opts ...cmp.Option) bool {
 	)
 	return cmp.Equal(a, b, opts...)
 }
-func Fail(t *testing.T, context ...interface{}) {
+func Fail(t *testing.T, context ...any) {
 	fmt.Println(Trace{}.New().SkipFile(1)[0])
 	for _, c := range context { Dump2(c) }
 	Dump2(Trace{}.New().SkipFile(1).Local())
@@ -48,18 +48,19 @@ func Fail(t *testing.T, context ...interface{}) {
 		panic("check failed")
 	}
 }
-func Assert(t *testing.T, statement bool, context ...interface{}) {
-	context = append([]interface{}{"assertion failed"}, context...)
+func Assert(t *testing.T, statement bool, context ...any) {
+	context = append([]any{"assertion failed"}, context...)
 	if !statement { Fail(t, context...) }
 }
-func AssertEquals(t *testing.T, a interface{}, b interface{}, context ...interface{}) {
-	args := append([]interface{}{"vars are not equal", a, b}, context...)
-	if !areEqual(a, b) { Fail(t, args...) }
+func AssertEquals(t *testing.T, a, b any, context ...any) {
+	if !areEqual(a, b) {
+		Fail(t, append([]any{"vars are not equal", a, b}, context...)...)
+	}
 }
-func AssertNotEqual(t *testing.T, a interface{}, b interface{}) {
+func AssertNotEqual(t *testing.T, a, b any) {
 	if areEqual(a, b) { Fail(t, "vars are equal", a, b) }
 }
-func ApproxEqual(a, b interface{}) bool {
+func ApproxEqual(a, b any) bool {
 	return areEqual(
 		a,
 		b,
@@ -67,7 +68,7 @@ func ApproxEqual(a, b interface{}) bool {
 		cmp.Comparer(func(a, b float64) bool { return floatsEqual(a, b, 1e-14) }),
 	)
 }
-func AssertNil(t *testing.T, value interface{}) {
+func AssertNil(t *testing.T, value any) {
 	Assert(t, isNil(value), "value is not nil", value)
 }
 
@@ -120,7 +121,7 @@ func floatsEqual(a, b, epsilon float64) bool {
 	if b == 0 { return a == 0 }
 	return math.Abs(1. - a / b) < epsilon
 }
-func isNil(value interface{}) bool {
+func isNil(value any) bool {
 	if value == nil { return true }
 	switch reflect.TypeOf(value).Kind() {
 		case reflect.Ptr,

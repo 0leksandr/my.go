@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-func Sdump2(value interface{}) string {
+func Sdump2(value any) string {
 	spew.Config.DisableCapacities = true
 	spew.Config.Indent = "    "
 
@@ -41,7 +41,7 @@ func Sdump2(value interface{}) string {
 	}
 	return strings.Join(lines, "\n")
 }
-func Dump2(values ...interface{}) {
+func Dump2(values ...any) {
 	for _, value := range values {
 		fmt.Printf("%v\n%s\n", fileLine(1), Sdump2(value))
 	}
