@@ -65,6 +65,9 @@ func ApproxEqual(a, b interface{}) bool {
 		cmp.Comparer(func(a, b float64) bool { return floatsEqual(a, b, 1e-14) }),
 	)
 }
+func AssertNil(t *testing.T, value interface{}) {
+	Assert(t, isNil(value))
+}
 
 func TestTypes(t *testing.T) {
 	parsedPackage := parseTypes(1)
@@ -82,4 +85,16 @@ func TestTypes(t *testing.T) {
 func floatsEqual(a, b, epsilon float64) bool {
 	if b == 0 { return a == 0 }
 	return math.Abs(1. - a / b) < epsilon
+}
+func isNil(value interface{}) bool {
+	if value == nil { return true }
+	switch reflect.TypeOf(value).Kind() {
+		case reflect.Ptr,
+			reflect.Map,
+			reflect.Array,
+			reflect.Chan,
+			reflect.Slice:
+				return reflect.ValueOf(value).IsNil()
+	}
+	return false
 }

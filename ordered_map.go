@@ -10,8 +10,8 @@ type OrderedMapPair[K comparable, V any] struct {
 	Key   K
 	Value V
 }
-func (OrderedMap[K, V]) New() OrderedMap[K, V] {
-	return OrderedMap[K, V]{
+func (*OrderedMap[K, V]) New() *OrderedMap[K, V] {
+	return &OrderedMap[K, V]{
 		keys:           make([]K, 0),
 		values:         make([]V, 0),
 		indices:        make(map[K]int),
@@ -25,10 +25,10 @@ func (m *OrderedMap[K, V]) Add(key K, value V) *OrderedMap[K, V] {
 	m.indices[key] = len(m.keys) - 1
 	return m
 }
-func (m OrderedMap[K, V]) Len() int {
+func (m *OrderedMap[K, V]) Len() int {
 	return len(m.indices)
 }
-func (m OrderedMap[K, V]) Get(key K) (V, bool) {
+func (m *OrderedMap[K, V]) Get(key K) (V, bool) {
 	if index, ok := m.indices[key]; ok {
 		return m.values[index], true
 	} else {
@@ -36,7 +36,7 @@ func (m OrderedMap[K, V]) Get(key K) (V, bool) {
 		return res, false
 	}
 }
-func (m OrderedMap[K, V]) Has(key K) bool {
+func (m *OrderedMap[K, V]) Has(key K) bool {
 	_, ok := m.indices[key]
 	return ok
 }
@@ -70,14 +70,14 @@ func (m *OrderedMap[K, V]) Del(key K) {
 		}
 	}
 }
-func (m OrderedMap[K, V]) Each(f func(key K, value V)) {
+func (m *OrderedMap[K, V]) Each(f func(key K, value V)) {
 	for index, key := range m.keys {
 		if !m.deletedIndices[index] {
 			f(key, m.values[index])
 		}
 	}
 }
-func (m OrderedMap[K, V]) Pairs() []OrderedMapPair[K, V] {
+func (m *OrderedMap[K, V]) Pairs() []OrderedMapPair[K, V] {
 	pairs := make([]OrderedMapPair[K, V], 0, m.Len())
 	m.Each(func(key K, value V) {
 		pairs = append(
@@ -90,7 +90,7 @@ func (m OrderedMap[K, V]) Pairs() []OrderedMapPair[K, V] {
 	})
 	return pairs
 }
-func (m OrderedMap[K, V]) Copy() OrderedMap[K, V] {
+func (m *OrderedMap[K, V]) Copy() *OrderedMap[K, V] {
 	keys := make([]K, 0, m.Len())
 	values := make([]V, 0, m.Len())
 	indices := make(map[K]int, m.Len())
@@ -101,14 +101,14 @@ func (m OrderedMap[K, V]) Copy() OrderedMap[K, V] {
 		indices[key] = index
 		index++
 	})
-	return OrderedMap[K, V]{
+	return &OrderedMap[K, V]{
 		keys:           keys,
 		values:         values,
 		indices:        indices,
 		deletedIndices: make(map[int]bool),
 	}
 }
-func (m OrderedMap[K, V]) Equals(other OrderedMap[K, V]) bool {
+func (m *OrderedMap[K, V]) Equals(other *OrderedMap[K, V]) bool {
 	if m.Len() != other.Len() { return false }
 	equals := true
 	m.Each(func(key K, value V) {
