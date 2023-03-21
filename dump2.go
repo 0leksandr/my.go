@@ -42,6 +42,7 @@ func Sdump2(value any) string {
 	return strings.Join(lines, "\n")
 }
 func Dump2(values ...any) {
+	if len(values) == 0 { values = []any{"---"} }
 	for _, value := range values {
 		fmt.Printf("%v\n%s\n", fileLine(1), Sdump2(value))
 	}

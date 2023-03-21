@@ -38,3 +38,10 @@ func ArrayMap[T1 any, T2 any](a []T1, f func(T1) T2) []T2 {
 	for i, t1 := range a { mapped[i] = f(t1) }
 	return mapped
 }
+func InsertAt[V any](slice []V, position int, value V) []V {
+	var emptyValue V
+	slice = append(slice, emptyValue)
+	copy(slice[position+1:], slice[position:])
+	slice[position] = value
+	return slice
+}

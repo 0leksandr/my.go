@@ -99,6 +99,15 @@ func TestArrayMap(t *testing.T) {
 		[]string{"[one]", "[two]", "[three]"},
 	)
 }
+func TestInsertAt(t *testing.T) {
+	slice := []string{"1", "2", "3"}
+	AssertEquals(t, InsertAt(slice, 1, "4"), []string{"1", "4", "2", "3"})
+	AssertEquals(t, slice, []string{"1", "2", "3"})
+	slice = InsertAt(slice, 0, "4")
+	AssertEquals(t, slice, []string{"4", "1", "2", "3"})
+	slice = InsertAt(slice, 4, "5")
+	AssertEquals(t, slice, []string{"4", "1", "2", "3", "5"})
+}
 func TestDummyMap(t *testing.T) {
 	m := DummyMap[string, string]{}
 	Assert(t, !m.Has("test"))
