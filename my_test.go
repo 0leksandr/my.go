@@ -2,9 +2,11 @@ package my
 
 import (
 	"errors"
+	"fmt"
 	"reflect"
 	"runtime"
 	"sort"
+	"sync"
 	"testing"
 	"time"
 )
@@ -162,7 +164,7 @@ func TestParseTypes(t *testing.T) {
 		t,
 		testType1,
 		ParsedStruct{
-			embedded: []string{"TestInterface"},
+			embedded: []ParsedNamedType{{"TestInterface", nil}},
 			methods:  map[string]ParsedFuncType{},
 		},
 	)
@@ -173,10 +175,10 @@ func TestParseTypes(t *testing.T) {
 		t,
 		testType2,
 		ParsedStruct{
-			embedded: []string{"TestInterface"},
+			embedded: []ParsedNamedType{{"TestInterface", nil}},
 			methods: map[string]ParsedFuncType{
 				"TestMethod":  {},
-				"testMethod2": {out: []ParsedType{ParsedNamedType{"bool"}}},
+				"testMethod2": {out: []ParsedType{ParsedNamedType{"bool", nil}}},
 			},
 		},
 	)
@@ -214,6 +216,7 @@ func TestRuntimeTypes(t *testing.T) {
 			"my.Error",
 			"my.Frame",
 			"my.K",
+			"my.Locker",
 			"my.OrderedMapPair[github.com/0leksandr/my%2ego.K·2,github.com/0leksandr/my%2ego.V·3]",
 			"my.OrderedMap[github.com/0leksandr/my%2ego.K·2,github.com/0leksandr/my%2ego.V·3]",
 			"my.OrderedMap[go.shape.string,go.shape.string]",
@@ -221,15 +224,23 @@ func TestRuntimeTypes(t *testing.T) {
 			"my.ParsedChanType",
 			"my.ParsedEllipsisType",
 			"my.ParsedFuncType",
+			"my.ParsedIndex",
 			"my.ParsedInterface",
 			"my.ParsedMapType",
 			"my.ParsedNamedType",
 			"my.ParsedStruct",
 			"my.ParsedType",
+			"my.ReservoirQueue[github.com/0leksandr/my%2ego.zeroQueueReceiver[int]]",
+			"my.ReservoirQueue[int]",
 			"my.TestTrend",
 			"my.Trace",
 			"my.Trend",
 			"my.V",
+			"my.ZeroQueue[int]",
+			"my.zeroQueueReceiver[go.shape.int]",
+			"my.zeroQueueReceiver[int]",
+			"my.zeroQueueZeroReceiver[go.shape.int]",
+			"my.zeroQueueZeroReceiver[int]",
 		},
 	)
 }
@@ -460,6 +471,17 @@ func TestError_WrapUnwrap(t *testing.T) {
 		}
 	}
 }
+func TestComboError(t *testing.T) {
+	AssertEquals(t, ComboError(nil, nil), nil)
+	AssertEquals(t, ComboError(nil, nil, nil, nil, nil), nil)
+	AssertEquals(t, ComboError(errors.New("test"), nil), errors.New("test"))
+	AssertEquals(t, ComboError(nil, errors.New("test"), nil), errors.New("test"))
+	err1 := errors.New("1")
+	err2 := errors.New("2")
+	err3 := errors.New("3")
+	AssertEquals(t, ComboError(err1, nil, err2), Error{}.New("1\n---\n2"))
+	AssertEquals(t, ComboError(err1, nil, err2, nil, err3, nil), Error{}.New("1\n---\n2\n---\n3"))
+}
 func TestProgressBar(t *testing.T) {
 	if false {
 		testProgress()
@@ -499,6 +521,148 @@ func TestTopChart(t *testing.T) {
 			AssertEquals(t, actual, testCase2.expected)
 		}
 	}
+}
+func TestLocker(t *testing.T) {
+	var locker Locker
+
+	var events []string
+	var accessEvents sync.Mutex
+	write := func(event string) {
+		accessEvents.Lock()
+		events = append(events, event)
+		accessEvents.Unlock()
+	}
+	lock := func() {
+		write("locking")
+		locker.Lock()
+		write("locked")
+	}
+	unlock := func() {
+		write("unlocking")
+		locker.Unlock()
+		write("unlocked")
+	}
+	wait := func() {
+		write("waiting")
+		locker.Wait()
+		write("waited")
+	}
+
+	wait()
+	lock()
+	unlock()
+	unlock()
+	lock()
+	lock()
+
+	nrWaits := 2
+	var startWaiting, doneWaiting sync.WaitGroup
+	startWaiting.Add(nrWaits)
+	doneWaiting.Add(nrWaits)
+	for i := 0; i < nrWaits; i++ {
+		go func() {
+			startWaiting.Done()
+			wait()
+			doneWaiting.Done()
+		}()
+	}
+	go func() {
+		startWaiting.Wait()
+		time.Sleep(1 * time.Microsecond)
+		lock()
+		unlock()
+	}()
+
+	doneWaiting.Wait()
+
+	AssertEquals(t, events, []string{
+		"waiting", "waited",
+		"locking", "locked",
+		"unlocking", "unlocked",
+		"unlocking", "unlocked",
+		"locking", "locked",
+		"locking", "locked",
+		"waiting", "waiting",
+			"locking", "locked",
+			"unlocking", "unlocked",
+		"waited", "waited",
+	})
+}
+func TestReservoir(t *testing.T) {
+	in := make(chan int)
+	out := Reservoir(in, 10)
+	values := []int{5, 7766, 232, 65, -23}
+	for _, value := range values { in <- value }
+	close(in)
+	var result []int
+	for value := range out { result = append(result, value) }
+	AssertEquals(t, result, values)
+}
+func TestReservoirQueue(t *testing.T) {
+	//queue := (*FairChannelQueue[int])(nil).New()
+	//queue := ChannelQueue[int]{}.New(3)
+	queue := ReservoirQueue[int]{}.New()
+	var values []int
+	var accessValues sync.Mutex
+	var wg sync.WaitGroup
+	get := func() {
+		wg.Add(1)
+		go func() {
+			accessValues.Lock()
+			values = append(values, queue.Get())
+			accessValues.Unlock()
+			wg.Done()
+		}()
+	}
+	for _, i := range []int{1, 2, 3} { queue.Put(i) }
+	for i := 0; i < 7; i++ {
+		time.Sleep(1 * time.Millisecond)
+		get()
+	}
+	time.Sleep(1 * time.Millisecond)
+	for _, i := range []int{4, 5, 6, 7} { queue.Put(i) }
+	wg.Wait()
+	AssertEquals(t, values, []int{1, 2, 3, 4, 5, 6, 7})
+}
+func TestZeroQueue(t *testing.T) {
+	queue := ZeroQueue[int]{}.New()
+	var values []string
+	var accessReceived sync.Mutex
+	store := func(operation string, value int) {
+		accessReceived.Lock()
+		values = append(values, fmt.Sprintf("%s %d", operation, value))
+		accessReceived.Unlock()
+	}
+	var wg sync.WaitGroup
+	max := 5
+	for i := 0; i < max; i++ {
+		wg.Add(2)
+		go func(i int) {
+			time.Sleep(time.Duration(i) * 10 * time.Millisecond)
+			queue.Put(i)
+			store("put", i)
+			wg.Done()
+		}(i)
+		go func() {
+			value := queue.Get()
+			store("got", value)
+			wg.Done()
+		}()
+	}
+	wg.Wait()
+	time.Sleep(10 * time.Millisecond) // MAYBE: find a better way to deal with race condition
+	AssertEquals(t, values, []string{
+		"got 0",
+		"put 0",
+		"got 1",
+		"put 1",
+		"got 2",
+		"put 2",
+		"got 3",
+		"put 3",
+		"got 4",
+		"put 4",
+	})
 }
 
 type TestInterface interface { TestMethod() }

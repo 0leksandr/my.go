@@ -81,13 +81,13 @@ func testTypes(t *testing.T, ignored []string) {
 	for structName, parsedStruct := range parsedPackage.structs {
 		if !InArray(structName, ignored) {
 			for _, embeddedName := range parsedStruct.embedded {
-				if embeddedStruct, isLocalStruct := parsedPackage.structs[embeddedName]; isLocalStruct {
+				if embeddedStruct, isLocalStruct := parsedPackage.structs[embeddedName.KeyName()]; isLocalStruct {
 					Assert(
 						t,
 						parsedStruct.Overrides(embeddedStruct),
 						"struct does not override", structName, embeddedName,
 					)
-				} else if embeddedInterface, isLocalInterface := parsedPackage.interfaces[embeddedName]
+				} else if embeddedInterface, isLocalInterface := parsedPackage.interfaces[embeddedName.KeyName()]
 					isLocalInterface {
 					Assert(
 						t,
@@ -96,7 +96,7 @@ func testTypes(t *testing.T, ignored []string) {
 					)
 				} else {
 					embeddedReal := ArrayFilter(types, func(_type reflect.Type) bool {
-						return _type.String() == embeddedName
+						return embeddedName.EqualsReal(_type)
 					})
 					if len(embeddedReal) != 1 {
 						panic(fmt.Sprintf(

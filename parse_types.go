@@ -8,6 +8,7 @@ import (
 	"io/fs"
 	"path"
 	"reflect"
+	"strings"
 )
 
 type ParsedPackage struct {
@@ -22,7 +23,8 @@ func (parsedPackage ParsedPackage) Interfaces() map[string]ParsedInterface {
 }
 
 type ParsedStruct struct {
-	embedded []string
+	indices  []ParsedIndex
+	embedded []ParsedNamedType
 	methods  map[string]ParsedFuncType
 }
 func (parsedStruct ParsedStruct) Implements(parsedInterface ParsedInterface) bool { // MAYBE: remove
@@ -112,10 +114,15 @@ type ParsedType interface {
 }
 
 type ParsedInterface struct {
+	indices []ParsedIndex
 	methods map[string]ParsedFuncType
 }
 func (parsedInterface ParsedInterface) Equals(other ParsedType) bool {
 	if otherParsedInterface, ok1 := other.(ParsedInterface); ok1 {
+		if len(parsedInterface.indices) != len(otherParsedInterface.indices) { return false }
+		for i, index := range parsedInterface.indices {
+			if !index._type.Equals(otherParsedInterface.indices[i]._type) { return false }
+		}
 		if len(parsedInterface.methods) != len(otherParsedInterface.methods) { return false }
 		for methodName, parsedMethod := range parsedInterface.methods {
 			if otherParsedMethod, ok2 := otherParsedInterface.methods[methodName]; ok2 {
@@ -147,17 +154,34 @@ func (parsedInterface ParsedInterface) EqualsReal(t reflect.Type) bool {
 
 type ParsedNamedType struct {
 	literalName string
+	indices     []ParsedNamedType
 }
 func (parsedNamedType ParsedNamedType) Equals(other ParsedType) bool {
 	if otherParsedNamedType, ok := other.(ParsedNamedType); ok {
-		return parsedNamedType.literalName == otherParsedNamedType.literalName
+		return parsedNamedType.String() == otherParsedNamedType.String()
 	} else {
 		return false
 	}
 }
 func (parsedNamedType ParsedNamedType) EqualsReal(t reflect.Type) bool {
 	if parsedNamedType.literalName == "any" { parsedNamedType.literalName = "interface {}" }
-	return t.String() == parsedNamedType.literalName
+	return t.String() == parsedNamedType.String()
+}
+func (parsedNamedType ParsedNamedType) String() string {
+	name := parsedNamedType.literalName
+	if len(parsedNamedType.indices) > 0 {
+		indices := strings.Join(
+			ArrayMap(parsedNamedType.indices, func(index ParsedNamedType) string {
+				return index.String()
+			}),
+			",",
+		)
+		name += "[" + indices + "]"
+	}
+	return name
+}
+func (parsedNamedType ParsedNamedType) KeyName() string {
+	return parsedNamedType.literalName
 }
 
 type ParsedArrayType struct {
@@ -234,6 +258,11 @@ func (parsedEllipsisType ParsedEllipsisType) EqualsReal(reflect.Type) bool {
 	return false // TODO: fix
 }
 
+type ParsedIndex struct {
+	name  string
+	_type ParsedType
+}
+
 func ParseTypes() ParsedPackage {
 	return parseTypes(path.Dir(GetTrace(true).SkipFile(1)[0].File))
 }
@@ -300,19 +329,42 @@ func parseTypes(dir string) ParsedPackage {
 				for _, spec := range genDecl.Specs {
 					if typeSpec, isTypeSpec := spec.(*ast.TypeSpec); isTypeSpec {
 						specName := typeSpec.Name.Name
+						parseIndices := func() []ParsedIndex {
+							var indices []ParsedIndex
+							typeParams := typeSpec.TypeParams
+							if typeParams != nil {
+								for _, field := range typeParams.List {
+									if len(field.Names) == 1 {
+										indices = append(indices, ParsedIndex{
+											field.Names[0].Name,
+											parseType(field.Type),
+										})
+									} else {
+										panic("cannot parse index")
+									}
+								}
+							}
+							return indices
+						}
+
 						astType := typeSpec.Type
 						if astStructType, isStructType := astType.(*ast.StructType); isStructType {
-							parsedStruct := ParsedStruct{methods: make(map[string]ParsedFuncType)}
+							parsedStruct := ParsedStruct{
+								indices: parseIndices(),
+								methods: make(map[string]ParsedFuncType),
+							}
 							for _, field := range astStructType.Fields.List {
 								if field.Names == nil {
-									if named, ok := parseType(field.Type).(ParsedNamedType); ok {
-										parsedStruct.embedded = append(parsedStruct.embedded, named.literalName)
+									if named, isNamedType := parseType(field.Type).(ParsedNamedType); isNamedType {
+										parsedStruct.embedded = append(parsedStruct.embedded, named)
 									}
 								}
 							}
 							parsedStructs[specName] = parsedStruct
 						} else if astInterfaceType, isInterfaceType := astType.(*ast.InterfaceType); isInterfaceType {
-							parsedInterfaces[specName] = parseInterface(astInterfaceType)
+							parsedInterface := parseInterface(astInterfaceType)
+							parsedInterface.indices = parseIndices()
+							parsedInterfaces[specName] = parsedInterface
 						}
 					}
 				}
@@ -327,8 +379,8 @@ func parseTypes(dir string) ParsedPackage {
 						if starExpr, isStarExpr := receiverType.(*ast.StarExpr); isStarExpr {
 							receiverType = starExpr.X
 						}
-						if ident, isIdent := receiverType.(*ast.Ident); isIdent {
-							receiverName := ident.Name
+						if receiver, okReceiver := parseType(receiverType).(ParsedNamedType); okReceiver {
+							receiverName := receiver.KeyName()
 							if _, structExists := parsedStructs[receiverName]; structExists {
 								parsedStructs[receiverName].methods[funcDecl.Name.Name] = parseFunc(funcDecl.Type)
 							}
@@ -387,23 +439,6 @@ func parseFunc(astFuncType *ast.FuncType) ParsedFuncType {
 }
 func parseType(astExpr ast.Expr) ParsedType {
 	switch astExpr.(type) {
-		case *ast.Ident:
-			return ParsedNamedType{astExpr.(*ast.Ident).Name}
-		case *ast.InterfaceType:
-			return parseInterface(astExpr.(*ast.InterfaceType))
-		case *ast.SelectorExpr:
-			return ParsedNamedType{fmt.Sprintf(
-				"%s.%s",
-				astExpr.(*ast.SelectorExpr).X.(*ast.Ident).Name,
-				astExpr.(*ast.SelectorExpr).Sel.Name,
-			)}
-		case *ast.StarExpr:
-			parsedX := parseType(astExpr.(*ast.StarExpr).X)
-			if parsedNamedType, isNamedType := parsedX.(ParsedNamedType); isNamedType {
-				return ParsedNamedType{"*" + parsedNamedType.literalName}
-			} else {
-				panic("ast.StarExpr.X is not a named type")
-			}
 		case *ast.ArrayType:
 			if astExpr.(*ast.ArrayType).Len != nil {
 				panic("TODO")
@@ -411,11 +446,6 @@ func parseType(astExpr ast.Expr) ParsedType {
 			return ParsedArrayType{
 				length:      -1,
 				elementType: parseType(astExpr.(*ast.ArrayType).Elt),
-			}
-		case *ast.MapType:
-			return ParsedMapType{
-				keyType:     parseType(astExpr.(*ast.MapType).Key),
-				elementType: parseType(astExpr.(*ast.MapType).Value),
 			}
 		case *ast.ChanType:
 			return ParsedChanType{
@@ -427,6 +457,57 @@ func parseType(astExpr ast.Expr) ParsedType {
 			}
 		case *ast.FuncType:
 			return parseFunc(astExpr.(*ast.FuncType))
+		case *ast.Ident:
+			return ParsedNamedType{astExpr.(*ast.Ident).Name, nil}
+		case *ast.IndexExpr:
+			indexExpr := astExpr.(*ast.IndexExpr)
+			if x, okX := parseType(indexExpr.X).(ParsedNamedType); okX {
+				if index, okIndex := parseType(indexExpr.Index).(ParsedNamedType); okIndex {
+					x.indices = []ParsedNamedType{index}
+					return x
+				}
+			}
+			Dump2(indexExpr)
+			panic("could not parse IndexExpr")
+		case *ast.IndexListExpr:
+			indexListExpr := astExpr.(*ast.IndexListExpr)
+			if x, okX := parseType(indexListExpr.X).(ParsedNamedType); okX {
+				indices := make([]ParsedNamedType, 0, len(indexListExpr.Indices))
+				for _, index := range indexListExpr.Indices {
+					if indexNamed, okIndex := parseType(index).(ParsedNamedType); okIndex {
+						indices = append(indices, indexNamed)
+					} else {
+						panic("cannot parse index")
+					}
+				}
+				x.indices = indices
+				return x
+			} else {
+				panic("cannot parse IndexListExpr")
+			}
+		case *ast.InterfaceType:
+			return parseInterface(astExpr.(*ast.InterfaceType))
+		case *ast.MapType:
+			return ParsedMapType{
+				keyType:     parseType(astExpr.(*ast.MapType).Key),
+				elementType: parseType(astExpr.(*ast.MapType).Value),
+			}
+		case *ast.SelectorExpr:
+			return ParsedNamedType{
+				fmt.Sprintf(
+					"%s.%s",
+					astExpr.(*ast.SelectorExpr).X.(*ast.Ident).Name,
+					astExpr.(*ast.SelectorExpr).Sel.Name,
+				),
+				nil,
+			}
+		case *ast.StarExpr:
+			parsedX := parseType(astExpr.(*ast.StarExpr).X)
+			if parsedNamedType, isNamedType := parsedX.(ParsedNamedType); isNamedType {
+				return ParsedNamedType{"*" + parsedNamedType.String(), nil}
+			} else {
+				panic("ast.StarExpr.X is not a named type")
+			}
 		default:
 			Dump2(astExpr)
 			panic("cannot parse expr as type")
