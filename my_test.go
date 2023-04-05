@@ -598,6 +598,31 @@ func TestReservoir(t *testing.T) {
 	for value := range out { result = append(result, value) }
 	AssertEquals(t, result, values)
 }
+func TestDispenser(t *testing.T) {
+	var processed [][]int
+	channel := make(chan int, 10)
+	var locker1, locker2 Locker
+
+	locker1.Lock()
+	go Dispenser(channel, func(values []int) {
+		locker1.Wait()
+		processed = append(processed, values)
+		locker2.Unlock()
+	})
+
+	for i := 0; i < 3; i++ { channel <- i }
+	locker2.Lock()
+	locker1.Unlock()
+	locker2.Wait()
+
+	locker1.Lock()
+	for i := 3; i < 6; i++ { channel <- i }
+	locker2.Lock()
+	locker1.Unlock()
+	locker2.Wait()
+
+	AssertEquals(t, processed, [][]int{{0, 1, 2}, {3, 4, 5}})
+}
 func TestReservoirQueue(t *testing.T) {
 	//queue := (*FairChannelQueue[int])(nil).New()
 	//queue := ChannelQueue[int]{}.New(3)

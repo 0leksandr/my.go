@@ -49,3 +49,21 @@ func Reservoir[T any](in <-chan T, size int) <-chan T {
 
 	return out
 }
+func Dispenser[T any](channel <-chan T, f func([]T)) {
+	for value := range channel {
+		values := []T{value}
+	    readingResidualValues: for {
+			select {
+				case nextValue, ok := <- channel:
+					if ok {
+						values = append(values, nextValue)
+					} else {
+						break readingResidualValues
+					}
+				default:
+					break readingResidualValues
+			}
+		}
+		f(values)
+	}
+}
