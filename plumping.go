@@ -1,6 +1,10 @@
 package my
 
-import "sync"
+import (
+	"context"
+	"sync"
+	"time"
+)
 
 func Reservoir[T any](in <-chan T, size int) <-chan T {
 	out := make(chan T)
@@ -48,6 +52,35 @@ func Reservoir[T any](in <-chan T, size int) <-chan T {
 	}()
 
 	return out
+}
+func Delayer[T any](channel <-chan T, min, max time.Duration, operation func([]T)) {
+	var cancelMin, cancelMax context.CancelFunc
+	var mutex sync.Mutex
+	var values []T
+	doOperation := func() {
+		mutex.Lock()
+		if cancelMax != nil {
+			cancelMax()
+			cancelMax = nil
+		}
+		if cancelMin != nil {
+			cancelMin()
+			cancelMin = nil
+		}
+		currentValues := values
+		values = nil
+		mutex.Unlock()
+		operation(currentValues)
+	}
+	Dispenser(channel, func(batch []T) {
+		mutex.Lock()
+		values = append(values, batch...)
+		if cancelMax == nil { cancelMax = CancellableTimer(max, doOperation) }
+		if cancelMin != nil { cancelMin() }
+		cancelMin = CancellableTimer(min, doOperation)
+		mutex.Unlock()
+	})
+	doOperation()
 }
 func Dispenser[T any](channel <-chan T, f func([]T)) {
 	for value := range channel {

@@ -191,18 +191,24 @@ func TestRuntimeTypes(t *testing.T) {
 	// - a type might be expected only because it is added here. This is a test, that influences actual code
 	// - some types are hard to add/catch/simulate (`my.OrderedMap[go.shape.string,go.shape.string]`)
 	expectedTypes := []reflect.Type{
+		reflect.TypeOf((*Clock)(nil)).Elem(),
 		reflect.TypeOf(Error{}),
 		reflect.TypeOf(Frame{}),
+		reflect.TypeOf(Locker{}),
+		reflect.TypeOf(MockClock{}),
 		reflect.TypeOf(ParsedArrayType{}),
 		reflect.TypeOf(ParsedChanType{}),
 		reflect.TypeOf(ParsedEllipsisType{}),
 		reflect.TypeOf(ParsedFuncType{}),
+		reflect.TypeOf(ParsedIndex{}),
 		reflect.TypeOf(ParsedInterface{}),
 		reflect.TypeOf(ParsedMapType{}),
 		reflect.TypeOf(ParsedNamedType{}),
 		reflect.TypeOf(ParsedStruct{}),
 		reflect.TypeOf((*ParsedType)(nil)).Elem(),
+		reflect.TypeOf(RealClock{}),
 		reflect.TypeOf(TestTrend{}),
+		reflect.TypeOf((*TimerInterface)(nil)).Elem(),
 		reflect.TypeOf(Trace{}),
 		reflect.TypeOf((*Trend)(nil)).Elem(),
 	}
@@ -212,11 +218,15 @@ func TestRuntimeTypes(t *testing.T) {
 		t,
 		ArrayMap(actualTypes, func(t reflect.Type) string { return t.String() }),
 		[]string{
+			"my.Call",
+			"my.Clock",
 			"my.DummyMap[string,string]",
 			"my.Error",
+			"my.Expected",
 			"my.Frame",
 			"my.K",
 			"my.Locker",
+			"my.MockClock",
 			"my.OrderedMapPair[github.com/0leksandr/my%2ego.K·2,github.com/0leksandr/my%2ego.V·3]",
 			"my.OrderedMap[github.com/0leksandr/my%2ego.K·2,github.com/0leksandr/my%2ego.V·3]",
 			"my.OrderedMap[go.shape.string,go.shape.string]",
@@ -230,13 +240,20 @@ func TestRuntimeTypes(t *testing.T) {
 			"my.ParsedNamedType",
 			"my.ParsedStruct",
 			"my.ParsedType",
+			"my.RealClock",
 			"my.ReservoirQueue[github.com/0leksandr/my%2ego.zeroQueueReceiver[int]]",
 			"my.ReservoirQueue[int]",
+			"my.TestCase",
 			"my.TestTrend",
+			"my.TimerInterface",
 			"my.Trace",
 			"my.Trend",
 			"my.V",
 			"my.ZeroQueue[int]",
+			"my.event",
+			"my.funcMockTimerCallee",
+			"my.mockTimer",
+			"my.mockTimerCallee",
 			"my.zeroQueueReceiver[go.shape.int]",
 			"my.zeroQueueReceiver[int]",
 			"my.zeroQueueZeroReceiver[go.shape.int]",
@@ -688,6 +705,169 @@ func TestZeroQueue(t *testing.T) {
 		"got 4",
 		"put 4",
 	})
+}
+func TestMockTime(t *testing.T) {
+	MockTime(func(mockClock *MockClock) {
+		start := clock.Now()
+		type event struct {
+			title string
+			time  time.Time
+		}
+		var events []event
+		assertEvents := func(expected []event) {
+			time.Sleep(10 * time.Millisecond) // MAYBE: find a better way to deal with race condition
+			AssertEquals(t, events, expected)
+			events = nil
+		}
+
+		nrSleeps := 5
+		var wg sync.WaitGroup
+		wg.Add(nrSleeps)
+		for i := 1; i <= nrSleeps; i++ {
+			go func(i int) {
+				mockClock.AfterFunc(time.Duration(i) * time.Second, func() {
+					events = append(events, event{fmt.Sprintf("slept for %ds", i), mockClock.Now()})
+				})
+				wg.Done()
+			}(i)
+		}
+		wg.Wait()
+
+		clock.Sleep(999 * time.Millisecond)
+		assertEvents(nil)
+
+		clock.Sleep(1 * time.Millisecond)
+		assertEvents([]event{{"slept for 1s", start.Add(1 * time.Second)}})
+
+		clock.Sleep(999 * time.Millisecond)
+		assertEvents(nil)
+
+		clock.Sleep(1 * time.Millisecond)
+		assertEvents([]event{{"slept for 2s", start.Add(2 * time.Second)}})
+
+		clock.Sleep(10 * time.Second)
+		assertEvents([]event{
+			{"slept for 3s", start.Add(3 * time.Second)},
+			{"slept for 4s", start.Add(4 * time.Second)},
+			{"slept for 5s", start.Add(5 * time.Second)},
+		})
+	})
+}
+func TestDelayer(t *testing.T) { // TODO: move
+	ms := func(ms int) time.Duration {
+		return time.Duration(ms) * time.Millisecond
+	}
+	sequence := func(from, to int) []int {
+		var sequence []int
+		for i := from; i <= to; i++ { sequence = append(sequence, i) }
+		return sequence
+	}
+	multiplyEach := func(sequence []int, n int) []int {
+		multiplied := make([]int, len(sequence))
+		for i, v := range sequence { multiplied[i] = v * n }
+		return multiplied
+	}
+	type Expected struct {
+		time    int
+		nrTicks int
+	}
+	type TestCase struct {
+		min      int
+		max      int
+		events   []int
+		expected []Expected
+	}
+	type Call struct {
+		duration time.Duration
+		nrTicks  int
+	}
+
+	testCases := []TestCase{
+		{
+			10,
+			20,
+			[]int{
+				7,
+				8,
+				12, //  5 + 7  | 27
+				18, // 10 + 8  | 45
+				22, // 10 + 12 | 67
+				16, // 10 + 6  | 83
+				8,
+			},
+			[]Expected{
+				{20, 3},
+				{37, 1},
+				{55, 1},
+				{77, 1},
+				{91, 2}, // 101
+			},
+		},
+		{
+			5,
+			15,
+			multiplyEach(sequence(0, 6), 2),
+			[]Expected{
+				{11, 4}, // 0 + 2 + 4 + (5 | 1)
+				{17, 1}, // (5 | 3)
+				{25, 1}, // (5 | 5)
+				{35, 1}, // (5 | 7)
+				{42, 1},
+			},
+		},
+		{
+			10,
+			15,
+			sequence(0, 10),
+			[]Expected{
+				{15, 6},
+				{30, 3},
+				{51, 2},
+				{55, 1},
+			},
+		},
+		{
+			9,
+			15,
+			multiplyEach(sequence(0, 6), 2),
+			[]Expected{
+				{15, 5}, // (3 | 5)
+				{29, 1}, // (9 | 1)
+				{39, 1}, // (9 | 3)
+				{42, 1},
+			},
+		},
+	}
+	for _, testCase := range testCases {
+		ticks := make(chan struct{})
+		var calls []Call
+		var accessCalls sync.Mutex
+		MockTime(func(clock *MockClock) {
+			start := clock.Now()
+			go func() {
+				ticks <- struct{}{}
+				for _, duration := range testCase.events {
+					time.Sleep(10 * time.Millisecond)
+					clock.Sleep(ms(duration))
+					time.Sleep(10 * time.Millisecond)
+					ticks <- struct{}{}
+				}
+				close(ticks)
+			}()
+			Delayer(ticks, ms(testCase.min), ms(testCase.max), func(ticks []struct{}) {
+				accessCalls.Lock()
+				calls = append(calls, Call{clock.Now().Sub(start), len(ticks)})
+				accessCalls.Unlock()
+			})
+		})
+		AssertEquals(
+			t,
+			calls,
+			ArrayMap(testCase.expected, func(expected Expected) Call {
+				return Call{ms(expected.time), expected.nrTicks}
+			}),
+		)
+	}
 }
 
 type TestInterface interface { TestMethod() }
