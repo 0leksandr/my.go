@@ -676,8 +676,8 @@ func TestZeroQueue(t *testing.T) {
 		accessReceived.Unlock()
 	}
 	var wg sync.WaitGroup
-	max := 5
-	for i := 0; i < max; i++ {
+	const NrItems = 5
+	for i := 0; i < NrItems; i++ {
 		wg.Add(2)
 		go func(i int) {
 			time.Sleep(time.Duration(i) * 10 * time.Millisecond)
