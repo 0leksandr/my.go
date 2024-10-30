@@ -53,7 +53,7 @@ func (trace Trace) Local() Trace {
 	projectRoot := regexp.MustCompile(fmt.Sprintf("^(.+%s)[^%s]+$", sep, sep)).FindStringSubmatch(firstFrame.File)[1]
 	projectRootLen := len(projectRoot)
 	for _, frame := range trace {
-		if frame.File[:projectRootLen] == projectRoot {
+		if len(frame.File) >= projectRootLen && frame.File[:projectRootLen] == projectRoot {
 			frame.File = frame.File[projectRootLen:]
 			localTrace = append(localTrace, frame)
 		}
