@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-func areEqual[T any](a, b T, opts ...cmp.Option) bool {
+func areEqual(a, b any, opts ...cmp.Option) bool {
 	//return reflect.DeepEqual(a, b)
 
 	var localTypesInterfaces []any
@@ -52,15 +52,15 @@ func Assert(t *testing.T, statement bool, context ...any) {
 	context = append([]any{"assertion failed"}, context...)
 	if !statement { Fail(t, context...) }
 }
-func AssertEquals[T any](t *testing.T, a, b T, context ...any) {
+func AssertEquals(t *testing.T, a, b any, context ...any) {
 	if !areEqual(a, b) {
 		Fail(t, append([]any{"vars are not equal", a, b}, context...)...)
 	}
 }
-func AssertNotEqual[T any](t *testing.T, a, b T) {
+func AssertNotEqual(t *testing.T, a, b any) {
 	if areEqual(a, b) { Fail(t, "vars are equal", a, b) }
 }
-func ApproxEqual[T any](a, b T) bool {
+func ApproxEqual(a, b any) bool {
 	return areEqual(
 		a,
 		b,

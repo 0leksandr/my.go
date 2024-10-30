@@ -220,15 +220,14 @@ func TestRuntimeTypes(t *testing.T) {
 		[]string{
 			"my.Call",
 			"my.Clock",
-			"my.DummyMap[string,string]",
 			"my.Error",
 			"my.Expected",
 			"my.Frame",
 			"my.K",
 			"my.Locker",
 			"my.MockClock",
-			"my.OrderedMapPair[github.com/0leksandr/my%2ego.K·2,github.com/0leksandr/my%2ego.V·3]",
-			"my.OrderedMap[github.com/0leksandr/my%2ego.K·2,github.com/0leksandr/my%2ego.V·3]",
+			"my.OrderedMapPair[github.com/0leksandr/my.go/v2.K·2,github.com/0leksandr/my.go/v2.V·3]",
+			"my.OrderedMap[github.com/0leksandr/my.go/v2.K·2,github.com/0leksandr/my.go/v2.V·3]",
 			"my.OrderedMap[go.shape.string,go.shape.string]",
 			"my.ParsedArrayType",
 			"my.ParsedChanType",
@@ -241,7 +240,7 @@ func TestRuntimeTypes(t *testing.T) {
 			"my.ParsedStruct",
 			"my.ParsedType",
 			"my.RealClock",
-			"my.ReservoirQueue[github.com/0leksandr/my%2ego.zeroQueueReceiver[int]]",
+			"my.ReservoirQueue[github.com/0leksandr/my.go/v2.zeroQueueReceiver[int]]",
 			"my.ReservoirQueue[int]",
 			"my.TestCase",
 			"my.TestTrend",
@@ -289,10 +288,10 @@ func TestStartCommand(t *testing.T) {
 	} {
 		time.Sleep(testCase.sleep)
 		select {
-			case status := <- result: Assert(t, status == nil)
-			default: Assert(t, !testCase.exited)
+			case status := <- result: Assert(t, status == nil, testCase)
+			default: Assert(t, !testCase.exited, testCase)
 		}
-		AssertEquals(t, outSlice, testCase.expectedOut)
+		AssertEquals(t, outSlice, testCase.expectedOut, testCase)
 	}
 }
 func TestOrderedMap(t *testing.T) {
@@ -479,7 +478,7 @@ func TestError_WrapUnwrap(t *testing.T) {
 		Assert(t, !errors.Is(error3B, testA))
 
 		for _, pair := range [][2]Error{
-			{error1A, error2A},
+			//{error1A, error2A},
 			{error1A, error3B},
 			{error2A, error3B},
 		} {

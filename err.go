@@ -61,7 +61,7 @@ func ComboError(error1, error2 error, errors ...error) error {
 	errors = ArrayFilter(errors, func(err error) bool { return err != nil })
 	switch len(errors) {
 		case 0:  return nil
-		case 1:  return Error{}.Wrap(errors[0])
+		case 1:  return errors[0]
 		default: return Error{}.New(strings.Join(
 			ArrayMap(errors, func(err error) string { return err.Error() }),
 			"\n---\n",
