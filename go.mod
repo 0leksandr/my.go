@@ -1,4 +1,4 @@
-module github.com/0leksandr/my.go
+module github.com/0leksandr/my.go/v2
 
 go 1.20
 
