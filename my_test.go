@@ -220,6 +220,7 @@ func TestRuntimeTypes(t *testing.T) {
 		[]string{
 			"my.Call",
 			"my.Clock",
+			"my.DummyMap[string,string]",
 			"my.Error",
 			"my.Expected",
 			"my.Frame",

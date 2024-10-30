@@ -27,7 +27,8 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-go-
 
-    - run: |
-        go get .
-        go build -v .
-        go test -v
+    - run: go get .
+
+    - run: go build -v .
+
+    - run: go test -v
