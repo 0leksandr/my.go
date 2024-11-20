@@ -869,6 +869,31 @@ func TestDelayer(t *testing.T) { // TODO: move
 		)
 	}
 }
+func TestInitMaps(t *testing.T) {
+	type initMapsTest struct {
+		map1 map[string]string
+		map2 map[string]map[int]float32
+		//ptr1 *map[string]int
+		//str1 *initMapsTest
+	}
+	type testCase struct {
+		test     initMapsTest
+		expected initMapsTest
+	}
+	for _, _testCase := range []testCase{
+		{
+			initMapsTest{},
+			initMapsTest{
+				map[string]string{},
+				map[string]map[int]float32{},
+				//&map[string]int{},
+				//nil,
+			},
+		},
+	}{
+		AssertEquals(t, InitMaps(_testCase.test), _testCase.expected)
+	}
+}
 
 type TestInterface interface { TestMethod() }
 //goland:noinspection GoUnusedExportedType
