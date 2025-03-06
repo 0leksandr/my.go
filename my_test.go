@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"regexp"
 	"runtime"
 	"sort"
 	"sync"
@@ -220,15 +221,15 @@ func TestRuntimeTypes(t *testing.T) {
 		[]string{
 			"my.Call",
 			"my.Clock",
-			"my.DummyMap[string,string]",
+			//"my.DummyMap[string,string]",
 			"my.Error",
 			"my.Expected",
 			"my.Frame",
 			"my.K",
 			"my.Locker",
 			"my.MockClock",
-			"my.OrderedMapPair[github.com/0leksandr/my%2ego.K·2,github.com/0leksandr/my%2ego.V·3]",
-			"my.OrderedMap[github.com/0leksandr/my%2ego.K·2,github.com/0leksandr/my%2ego.V·3]",
+			"my.OrderedMapPair[github.com/0leksandr/my%2ego.K·3,github.com/0leksandr/my%2ego.V·4]",
+			"my.OrderedMap[github.com/0leksandr/my%2ego.K·3,github.com/0leksandr/my%2ego.V·4]",
 			"my.OrderedMap[go.shape.string,go.shape.string]",
 			"my.ParsedArrayType",
 			"my.ParsedChanType",
@@ -252,8 +253,12 @@ func TestRuntimeTypes(t *testing.T) {
 			"my.ZeroQueue[int]",
 			"my.event",
 			"my.funcMockTimerCallee",
+			"my.initMapsTest",
+			"my.key",
 			"my.mockTimer",
 			"my.mockTimerCallee",
+			"my.testReference",
+			"my.testString",
 			"my.zeroQueueReceiver[go.shape.int]",
 			"my.zeroQueueReceiver[int]",
 			"my.zeroQueueZeroReceiver[go.shape.int]",
@@ -892,6 +897,153 @@ func TestInitMaps(t *testing.T) {
 		},
 	}{
 		AssertEquals(t, InitMaps(_testCase.test), _testCase.expected)
+	}
+}
+func TestFormatter(t *testing.T) {
+	type testString struct {
+		value string
+	}
+
+	type testReference struct {
+		reference *testReference
+	}
+
+	type testCase struct {
+		value             any
+		expectedFormatted string
+	}
+	for _, _testCase := range []testCase{
+		{"hello",      `"hello"`},
+		{nil,          "nil"},
+		{true,         "true"},
+		{false,        "false"},
+		{-13,          "-13"},
+		{6.66,         "6.66"},
+		{-1.23e+45,    "-1.23e+45"},
+		//{1e100000,     "INF"},
+		{"123",        `"123"`},
+		{123,          "123"},
+		{123.,         "123."},
+		{([]int)(nil), "([]int)(nil)"},
+		{[]int{},      "[]int{}"},
+		{
+			func(int) string { return "test" },
+			"func(int) string",
+		},
+		{
+			func(int, float64) (string, error) { return "", nil },
+			"func(int, float64) (string, error)",
+		},
+		{
+			[]int{1, 2, 3},
+`[]int{
+	1,
+	2,
+	3,
+}`,
+		},
+		{
+			testString{
+				value: "hello",
+			},
+`my.testString{
+	value: "hello",
+}`,
+		},
+		{
+			[]any{
+				"hello",
+				"\"hello\"",
+				0,
+				0.,
+			},
+`[]interface {}{
+	"hello",
+	"\"hello\"",
+	0,
+	0.,
+}`,
+		},
+		{
+`
+	this is a
+	multiline text
+`,
+"`" + `
+	this is a
+	multiline text
+` + "`",
+		},
+		{
+			"Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+"`" + `Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempo
+r incididunt ut labore et dolore magna aliqua.` + "`",
+		},
+		{(map[string]int)(nil), "(map[string]int)(nil)"},
+		{map[string]int{}, "map[string]int{}"},
+		{
+			map[string]any{
+				"test1": 2,
+				"test3": "4",
+			},
+`map[string]interface {}{
+	"test1": 2,
+	"test3": "4",
+}`,
+		},
+		{
+			map[any]any{
+				"test1": 2,
+				3:       "4",
+				33:      8,
+				"33":    "8",
+				34:      9,
+				5.6:     testString{"7"},
+				"func":  func(int, float64) (string, error) { return "", nil },
+			},
+`map[interface {}]interface {}{
+	3: "4",
+	5.6: my.testString{
+		value: "7",
+	},
+	33: 8,
+	34: 9,
+	"33": "8",
+	"func": func(int, float64) (string, error),
+	"test1": 2,
+}`,
+		},
+	} {
+		AssertEquals(
+			t,
+			formatter{}.New().format(_testCase.value, 1),
+			_testCase.expectedFormatted,
+		)
+	}
+
+	for _, _testCase := range []testCase{
+		{
+			(func() *testReference {
+				ref0 := &testReference{}
+				ref1 := &testReference{ref0}
+				ref0.reference = ref1
+				return ref0
+			})(),
+`^&my\.testReference{
+	reference: &my\.testReference{
+		reference: \[circular reference 0x[0-9a-f]{11}\],
+	},
+}$`,
+		},
+	} {
+		actual := formatter{}.New().format(_testCase.value, 1)
+		Assert(
+			t,
+			regexp.
+				MustCompile(_testCase.expectedFormatted).
+				MatchString(actual),
+			actual,
+		)
 	}
 }
 
