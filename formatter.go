@@ -37,6 +37,18 @@ func (formatter formatter) format(value any, indent int) string {
 		return firstIndent + regexp.MustCompile("\n").ReplaceAllString(s, "\n" + indentStr)
 	}
 	switch rk {
+		case reflect.Chan,
+		reflect.Func,
+		reflect.Interface,
+		reflect.Map,
+		reflect.Pointer,
+		reflect.Slice:
+			if rv.IsNil() {
+				return fmt.Sprintf("(%s)(nil)", formatter.formatType(rt))
+			}
+		default:
+	}
+	switch rk {
 		case reflect.Struct:
 			str := formatter.formatType(rt)
 			if rv.NumField() == 0 {
@@ -93,7 +105,10 @@ func (formatter formatter) format(value any, indent int) string {
 			_type := "["
 			if rk == reflect.Array { _type += strconv.Itoa(rv.Len()) }
 			_type += "]" + formatter.formatType(rv.Type().Elem())
-			if rv.IsNil() { return fmt.Sprintf("(%s)(nil)", _type) }
+
+			if bytes, ok := value.([]byte); ok {
+				return fmt.Sprintf("[]byte(%s)", formatter.format(string(bytes), indent))
+			}
 
 			str := ""
 			str += _type + "{"
@@ -105,7 +120,7 @@ func (formatter formatter) format(value any, indent int) string {
 			str += "}"
 			return str
 		case reflect.Chan:
-			return fmt.Sprintf("[chan %s]", formatter.formatType(rt.Elem()))
+			return fmt.Sprintf("(chan %s)(nil)", formatter.formatType(rt.Elem()))
 		case reflect.Func:
 			var args []string
 			for i := 0; i < rv.Type().NumIn(); i++ {
@@ -113,19 +128,16 @@ func (formatter formatter) format(value any, indent int) string {
 			}
 			var ret []string
 			for i := 0; i < rv.Type().NumOut(); i++ {
-				ret = append(ret, formatter.formatType(rv.Type().Out(i)))
+				ret = append(ret, "_ " + formatter.formatType(rv.Type().Out(i)))
 			}
-			retStr := strings.Join(ret, ", ")
-			if len(ret) > 1 {
-				retStr = "(" + retStr + ")"
-			}
-			return fmt.Sprintf("func(%s) %s", strings.Join(args, ", "), retStr)
+			return fmt.Sprintf(
+				"func(%s) (%s) { return }",
+				strings.Join(args, ", "),
+				strings.Join(ret, ", "),
+			)
 		case reflect.Interface:
 			return formatter.format(rv.Elem().Interface(), indent + indentLen)
 		case reflect.Map:
-			_type := fmt.Sprintf("map[%s]%s", formatter.formatType(rt.Key()), formatter.formatType(rt.Elem()))
-			if rv.IsNil() { return fmt.Sprintf("(%s)(nil)", _type) }
-
 			type key struct {
 				key   any
 				value   reflect.Value
@@ -172,7 +184,7 @@ func (formatter formatter) format(value any, indent int) string {
 			})
 			l := rv.Len()
 			str := ""
-			str += _type + "{"
+			str += fmt.Sprintf("map[%s]%s", formatter.formatType(rt.Key()), formatter.formatType(rt.Elem())) + "{"
 			if l > 0 { str += "\n" }
 			for _, _key := range keys {
 				str += indentFn(
@@ -226,9 +238,10 @@ func (formatter formatter) format(value any, indent int) string {
 				escapeWrap("\"")
 			}
 			return str
+		case reflect.Uintptr:
+			return formatter.formatUintptr(value.(uintptr))
 
 		case reflect.Invalid,
-		reflect.Uintptr,
 		reflect.UnsafePointer,
 		reflect.Complex64,
 		reflect.Complex128:
@@ -236,6 +249,9 @@ func (formatter formatter) format(value any, indent int) string {
 		default: panic("unreachable: " + rk.String())
 	}
 }
-func (formatter formatter) formatType(t reflect.Type) string {
+func (formatter) formatType(t reflect.Type) string {
 	return t.String()
+}
+func (formatter) formatUintptr(v uintptr) string {
+	return fmt.Sprintf("%#x", v)
 }
