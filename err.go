@@ -18,6 +18,10 @@ func PanicIf(err error) {
 func Must(err error) {
 	panicIf(err)
 }
+func MustFirst[T any](first T, err error) T {
+	panicIf(err)
+	return first
+}
 
 type Error struct {
 	error

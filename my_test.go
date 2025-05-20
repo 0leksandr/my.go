@@ -3,6 +3,7 @@ package my
 import (
 	"errors"
 	"fmt"
+	"go/ast"
 	"reflect"
 	"regexp"
 	"runtime"
@@ -147,7 +148,9 @@ func TestDummyMap(t *testing.T) {
 	)
 }
 func TestParseTypes(t *testing.T) {
-	parsed := ParseTypes()
+	parsedPackages := ParseTypes()
+	AssertEquals(t, len(parsedPackages), 1)
+	parsed := parsedPackages["my"]
 
 	testInterface := parsed.Interfaces()["TestInterface"]
 	AssertEquals(
@@ -1053,6 +1056,32 @@ r incididunt ut labore et dolore magna aliqua.` + "`",
 			actual,
 		)
 	}
+}
+func TestGetExportedFields(t *testing.T) {
+	type TestType struct {
+		Field1 string
+		field2 string
+		Field3 string
+	}
+	testValue := TestType{
+		Field1: "value1",
+		field2: "value2",
+		Field3: "value3",
+	}
+	AssertEquals(
+		t,
+		GetExportedFields(testValue),
+		[]any{
+			"value1",
+			"value3",
+		},
+	)
+}
+
+func TestYo(t *testing.T) {
+	//parseGo(func(decl ast.Decl) {})
+	parseGoDir("/Users/oleksandr.boiko/_/MythicalGames/platform-items", func(decl ast.Decl) {})
+	//Dump2(parseTypesRecursively("/Users/oleksandr.boiko/_/MythicalGames/platform-items"))
 }
 
 type TestInterface interface { TestMethod() }

@@ -6,10 +6,13 @@ import (
 	"go/parser"
 	"go/token"
 	"io/fs"
+	"os"
 	"path"
 	"reflect"
 	"strings"
 )
+
+// TODO: contexts (local/non-global types, interfaces, functions, values?)
 
 type ParsedPackage struct {
 	structs    map[string]ParsedStruct
@@ -21,11 +24,25 @@ func (parsedPackage ParsedPackage) Structs() map[string]ParsedStruct {
 func (parsedPackage ParsedPackage) Interfaces() map[string]ParsedInterface {
 	return parsedPackage.interfaces
 }
+func (parsedPackage ParsedPackage) Merge(other ParsedPackage) ParsedPackage {
+	structs := CopyMap(parsedPackage.structs)
+	for name, parsedStruct := range other.structs {
+		if _, exists := structs[name]; exists { panic(nil) }
+		structs[name] = parsedStruct
+	}
+	interfaces := CopyMap(parsedPackage.interfaces)
+	for name, parsedInterface := range other.interfaces {
+		if _, exists := interfaces[name]; exists { panic(nil) }
+		interfaces[name] = parsedInterface
+	}
+	return ParsedPackage{structs, interfaces}
+}
 
 type ParsedStruct struct {
 	indices  []ParsedIndex
 	embedded []ParsedNamedType
 	methods  map[string]ParsedFuncType
+	fields   map[string]ParsedType
 }
 func (parsedStruct ParsedStruct) Implements(parsedInterface ParsedInterface) bool { // MAYBE: remove
 	for methodName, interfaceMethod := range parsedInterface.methods {
@@ -258,20 +275,51 @@ func (parsedEllipsisType ParsedEllipsisType) EqualsReal(reflect.Type) bool {
 	return false // TODO: fix
 }
 
+type ParsedPointerType struct {
+	elementType ParsedType
+}
+func (parsedPointerType ParsedPointerType) Equals(other ParsedType) bool {
+	if otherParsedPointerType, ok := other.(ParsedPointerType); ok {
+		return parsedPointerType.elementType.Equals(otherParsedPointerType.elementType)
+	} else {
+		return false
+	}
+}
+func (parsedPointerType ParsedPointerType) EqualsReal(t reflect.Type) bool {
+	if t.Kind() == reflect.Ptr {
+		return parsedPointerType.elementType.EqualsReal(t.Elem())
+	} else {
+		return false
+	}
+}
+
 type ParsedIndex struct {
 	name  string
 	_type ParsedType
 }
 
-func ParseTypes() ParsedPackage {
-	return parseTypes(path.Dir(GetTrace(true).SkipFile(1)[0].File))
+func ParseTypes() map[string]ParsedPackage {
+	return parseTypesRecursively(path.Dir(GetTrace(true).SkipFile(1)[0].File))
 }
-func parseTypes(dir string) ParsedPackage {
+func parseTypesRecursively(dir string) map[string]ParsedPackage {
+	parsedPackages := parseTypes(dir)
+	for _, entry := range MustFirst(os.ReadDir(dir)) {
+		if entry.IsDir() {
+			for packageName, parsedPackage := range parseTypesRecursively(path.Join(dir, entry.Name())) {
+				if existingParsedPackage, exists := parsedPackages[packageName]; exists {
+					parsedPackage = parsedPackage.Merge(existingParsedPackage)
+				}
+				parsedPackages[packageName] = parsedPackage
+			}
+		}
+	}
+	return parsedPackages
+}
+func parseTypes(dir string) map[string]ParsedPackage {
 	//_, errImport := importer.Default().Import(dir)
 	//PanicIf(errImport)
 
-	parsedStructs := make(map[string]ParsedStruct)
-	parsedInterfaces := make(map[string]ParsedInterface)
+	parsedPackages := map[string]ParsedPackage{}
 
 	fset := token.NewFileSet()
 	pkgs, errParseDir := parser.ParseDir(
@@ -281,7 +329,9 @@ func parseTypes(dir string) ParsedPackage {
 		parser.AllErrors,
 	)
 	PanicIf(errParseDir)
-	for _, astPkg := range pkgs {
+	for packageName, astPkg := range pkgs {
+		if _, exists := parsedPackages[packageName]; exists { panic(nil) }
+
 		//conf := types2.Config{Importer: importer.Default()}
 		//files := make([]*ast.File, 0, len(astPkg.Files))
 		//for _, astFile := range astPkg.Files {
@@ -316,6 +366,9 @@ func parseTypes(dir string) ParsedPackage {
 		//		}
 		//	}
 		//}
+
+		parsedStructs := make(map[string]ParsedStruct)
+		parsedInterfaces := make(map[string]ParsedInterface)
 
 		walkDecls := func(f func(ast.Decl)) {
 			for _, astFile := range astPkg.Files {
@@ -382,19 +435,28 @@ func parseTypes(dir string) ParsedPackage {
 						if receiver, okReceiver := parseType(receiverType).(ParsedNamedType); okReceiver {
 							receiverName := receiver.KeyName()
 							if _, structExists := parsedStructs[receiverName]; structExists {
-								parsedStructs[receiverName].methods[funcDecl.Name.Name] = parseFunc(funcDecl.Type)
+								parsedStructs[receiverName].methods[funcDecl.Name.Name] = parseFuncType(funcDecl.Type)
+							} else {
+								// TODO: implement
+								// type Trace []Frame
+								panic(nil)
 							}
-						}
-					}
+						} else { panic(nil) }
+					} else { panic(nil) }
 				}
+
+				//Dump2(funcDecl.Body.List)
+				//panic("test")
 			}
 		})
+
+		parsedPackages[packageName] = ParsedPackage{
+			structs:    parsedStructs,
+			interfaces: parsedInterfaces,
+		}
 	}
 
-	return ParsedPackage{
-		structs:    parsedStructs,
-		interfaces: parsedInterfaces,
-	}
+	return parsedPackages
 }
 func parseInterface(astInterfaceType *ast.InterfaceType) ParsedInterface {
 	parsedMethods := make(map[string]ParsedFuncType)
@@ -405,13 +467,13 @@ func parseInterface(astInterfaceType *ast.InterfaceType) ParsedInterface {
 				Dump2(astInterfaceType)
 				panic("non-singular method name")
 			}
-			parsedMethods[names[0].Name] = parseFunc(astFuncType)
+			parsedMethods[names[0].Name] = parseFuncType(astFuncType)
 		}
 	}
 
 	return ParsedInterface{methods: parsedMethods}
 }
-func parseFunc(astFuncType *ast.FuncType) ParsedFuncType {
+func parseFuncType(astFuncType *ast.FuncType) ParsedFuncType {
 	var in []ParsedType
 	paramsList := astFuncType.Params.List
 	if len(paramsList) > 0 {
@@ -456,7 +518,7 @@ func parseType(astExpr ast.Expr) ParsedType {
 				elementType: parseType(astExpr.(*ast.Ellipsis).Elt),
 			}
 		case *ast.FuncType:
-			return parseFunc(astExpr.(*ast.FuncType))
+			return parseFuncType(astExpr.(*ast.FuncType))
 		case *ast.Ident:
 			return ParsedNamedType{astExpr.(*ast.Ident).Name, nil}
 		case *ast.IndexExpr:

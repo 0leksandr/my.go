@@ -54,6 +54,18 @@ func (reflectStruct ReflectStructSetter) Final() any {
 	return reflectStruct.rs.Interface()
 }
 
+func GetExportedFields(_struct any) []any {
+	checkIsStruct(_struct)
+	var fields []any
+	rs := reflect.ValueOf(_struct)
+	for _, field := range reflect.VisibleFields(rs.Type()) {
+		if field.IsExported() {
+			fields = append(fields, rs.FieldByName(field.Name).Interface())
+		}
+	}
+	return fields
+}
+
 func checkIsStruct(_struct any) {
 	if reflect.ValueOf(_struct).Kind() != reflect.Struct {
 		panic("not a struct")

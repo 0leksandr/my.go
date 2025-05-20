@@ -20,3 +20,11 @@ func dumpAt(skip int, values ...any) {
 func Dump(values ...any) {
 	dumpAt(1, values...)
 }
+
+func Dump3(values ...any) {
+	fl := fileLine(1)
+	if len(values) == 0 { fmt.Println(fl) }
+	for _, val := range values {
+		fmt.Println(fl + " " + formatter{}.New().Format(val))
+	}
+}

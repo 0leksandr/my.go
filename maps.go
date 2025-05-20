@@ -25,9 +25,20 @@ func InitMaps[T any](obj T) T {
 				setter.Set(i, InitMaps(getter.Get(i)))
 			}
 			return setter.Final().(T)
-		//case reflect.Ptr:
-		//	return reflect.ValueOf(InitMaps(val.Elem().Interface())).Addr().Interface().(T)
+		case reflect.Ptr:
+			v := reflect.ValueOf(InitMaps(val.Elem().Interface()))
+			addressableValue := reflect.New(v.Type()).Elem()
+			addressableValue.Set(v)
+			return addressableValue.Addr().Interface().(T)
 		default:
 			return obj
 	}
+}
+
+func CopyMap[K comparable, V any](m map[K]V) map[K]V {
+	_copy := make(map[K]V, len(m))
+	for k, v := range m {
+		_copy[k] = v
+	}
+	return _copy
 }

@@ -76,41 +76,42 @@ func TestTypes(t *testing.T) {
 	testTypes(t, nil)
 }
 func testTypes(t *testing.T, ignored []string) {
-	parsedPackage := parseTypes(path.Dir(GetTrace(true).SkipFile(1)[0].File))
-	types := Types(true)
-	for structName, parsedStruct := range parsedPackage.structs {
-		if !InArray(structName, ignored) {
-			for _, embeddedName := range parsedStruct.embedded {
-				if embeddedStruct, isLocalStruct := parsedPackage.structs[embeddedName.KeyName()]; isLocalStruct {
-					Assert(
-						t,
-						parsedStruct.Overrides(embeddedStruct),
-						"struct does not override", structName, embeddedName,
-					)
-				} else if embeddedInterface, isLocalInterface := parsedPackage.interfaces[embeddedName.KeyName()]
-					isLocalInterface {
-					Assert(
-						t,
-						parsedStruct.Implements(embeddedInterface),
-						"struct does not implement", structName, embeddedName,
-					)
-				} else {
-					embeddedReal := ArrayFilter(types, func(_type reflect.Type) bool {
-						return embeddedName.EqualsReal(_type)
-					})
-					if len(embeddedReal) != 1 {
-						panic(fmt.Sprintf(
-							"embedded type not found: %s %s(%d)",
-							structName,
-							embeddedName,
-							len(embeddedReal),
-						))
+	for _, parsedPackage := range parseTypes(path.Dir(GetTrace(true).SkipFile(1)[0].File)) {
+		types := Types(true)
+		for structName, parsedStruct := range parsedPackage.structs {
+			if !InArray(structName, ignored) {
+				for _, embeddedName := range parsedStruct.embedded {
+					if embeddedStruct, isLocalStruct := parsedPackage.structs[embeddedName.KeyName()]; isLocalStruct {
+						Assert(
+							t,
+							parsedStruct.Overrides(embeddedStruct),
+							"struct does not override", structName, embeddedName,
+						)
+					} else if embeddedInterface, isLocalInterface := parsedPackage.interfaces[embeddedName.KeyName()]
+						isLocalInterface {
+						Assert(
+							t,
+							parsedStruct.Implements(embeddedInterface),
+							"struct does not implement", structName, embeddedName,
+						)
+					} else {
+						embeddedReal := ArrayFilter(types, func(_type reflect.Type) bool {
+							return embeddedName.EqualsReal(_type)
+						})
+						if len(embeddedReal) != 1 {
+							panic(fmt.Sprintf(
+								"embedded type not found: %s %s(%d)",
+								structName,
+								embeddedName,
+								len(embeddedReal),
+							))
+						}
+						Assert(
+							t,
+							parsedStruct.ImplementsReal(embeddedReal[0]),
+							"struct does not implement", structName, embeddedName,
+						)
 					}
-					Assert(
-						t,
-						parsedStruct.ImplementsReal(embeddedReal[0]),
-						"struct does not implement", structName, embeddedName,
-					)
 				}
 			}
 		}

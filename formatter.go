@@ -37,7 +37,8 @@ func (formatter formatter) format(value any, indent int) string {
 		return firstIndent + regexp.MustCompile("\n").ReplaceAllString(s, "\n" + indentStr)
 	}
 	switch rk {
-		case reflect.Chan,
+		case
+		reflect.Chan,
 		reflect.Func,
 		reflect.Interface,
 		reflect.Map,
@@ -71,11 +72,15 @@ func (formatter formatter) format(value any, indent int) string {
 			return str
 		case reflect.Pointer:
 			addr := rv.Pointer()
+			formattedAddr := formatter.formatUintptr(addr)
 			if _, ok := formatter.addresses[addr]; ok {
-				return fmt.Sprintf("[circular reference %#x]", addr)
+				return "[circular reference " + formattedAddr + "]"
 			} else {
 				formatter.addresses[addr] = struct{}{}
-				return "&" + formatter.format(rv.Elem().Interface(), indent)
+				formattedValue := "&" + formatter.format(rv.Elem().Interface(), indent)
+				lines := strings.Split(formattedValue, "\n")
+				lines[0] += " // " + formattedAddr
+				return strings.Join(lines, "\n")
 			}
 		case reflect.Bool:
 			if rv.Bool() {
@@ -201,6 +206,10 @@ func (formatter formatter) format(value any, indent int) string {
 		case reflect.String:
 			str := rv.String()
 			availableLength := lineLen - indent - 2
+			if availableLength <= 0 { // TODO: handle
+				panic("availableLength <= 0")
+				availableLength = 10
+			}
 			isMultiline := strings.ContainsAny(str, "\n")
 			if !isMultiline {
 				if availableLength < len(str) {
