@@ -29,11 +29,23 @@ func (locker *Locker) Wait() {
 	locker.wg.Wait()
 }
 
-func Go(f func()) { // MAYBE: move
+func Go(
+	f func(),
+	_recover func(any),
+) { // MAYBE: move
 	var goroutineStarted Locker
 	goroutineStarted.Lock()
 	go func() {
 		goroutineStarted.Unlock()
+
+		if _recover != nil {
+			defer func() {
+				if r := recover(); r != nil {
+					_recover(r)
+				}
+			}()
+		}
+
 		f()
 	}()
 	goroutineStarted.Wait()

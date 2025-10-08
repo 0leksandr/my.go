@@ -11,9 +11,7 @@ import (
 	"time"
 )
 
-func areEqual(a, b any, opts ...cmp.Option) bool {
-	//return reflect.DeepEqual(a, b)
-
+func getDiff(a, b any, opts ...cmp.Option) string {
 	var localTypesInterfaces []any
 	var isStruct func(reflect.Type) bool
 	isStruct = func(_type reflect.Type) bool {
@@ -36,7 +34,11 @@ func areEqual(a, b any, opts ...cmp.Option) bool {
 		cmp.Comparer(func(a, b time.Time) bool { return a.Round(time.Duration(0)) == b.Round(time.Duration(0)) }),
 		cmp.AllowUnexported(localTypesInterfaces...),
 	)
-	return cmp.Equal(a, b, opts...)
+	return cmp.Diff(a, b, opts...)
+}
+func areEqual(a, b any, opts ...cmp.Option) bool {
+	//return reflect.DeepEqual(a, b)
+	return getDiff(a, b, opts...) == ""
 }
 func Fail(t *testing.T, context ...any) {
 	fmt.Println(Trace{}.New().SkipFile(1)[0])
@@ -54,7 +56,7 @@ func Assert(t *testing.T, statement bool, context ...any) {
 }
 func AssertEquals(t *testing.T, a, b any, context ...any) {
 	if !areEqual(a, b) {
-		Fail(t, append([]any{"vars are not equal", a, b}, context...)...)
+		Fail(t, append([]any{"vars are not equal", a, b, getDiff(a, b)}, context...)...)
 	}
 }
 func AssertNotEqual(t *testing.T, a, b any) {
