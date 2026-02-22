@@ -592,7 +592,3 @@ func parseType(astExpr ast.Expr) ParsedType {
 			panic("cannot parse expr as type")
 	}
 }
-
-// func tokenPosToFileLine(pos token.Pos) string {
-// 	return pos.String()
-// }
