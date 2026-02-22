@@ -371,8 +371,22 @@ func parseTypes(dir string) map[string]ParsedPackage {
 		parsedInterfaces := make(map[string]ParsedInterface)
 
 		walkDecls := func(f func(ast.Decl)) {
+			var lastDecl ast.Decl
+			defer func() {
+				if p := recover(); p != nil {
+					position := fset.Position(lastDecl.Pos())
+					panic(fmt.Sprintf(
+						"[%s:%d] %s",
+						position.Filename,
+						position.Line,
+						p,
+					))
+				}
+			}()
+
 			for _, astFile := range astPkg.Files {
 				for _, decl := range astFile.Decls {
+					lastDecl = decl
 					f(decl)
 				}
 			}
@@ -438,8 +452,11 @@ func parseTypes(dir string) map[string]ParsedPackage {
 								parsedStructs[receiverName].methods[funcDecl.Name.Name] = parseFuncType(funcDecl.Type)
 							} else {
 								// TODO: implement
-								// type Trace []Frame
-								panic(nil)
+								// panic(fmt.Sprintf(
+								// 	"Receiver %s does not have defined struct (%s)",
+								// 	receiverName,
+								// 	decl.Pos(),
+								// ))
 							}
 						} else { panic(nil) }
 					} else { panic(nil) }
@@ -575,3 +592,7 @@ func parseType(astExpr ast.Expr) ParsedType {
 			panic("cannot parse expr as type")
 	}
 }
+
+// func tokenPosToFileLine(pos token.Pos) string {
+// 	return pos.String()
+// }
