@@ -3,7 +3,6 @@ package my
 import (
 	"errors"
 	"fmt"
-	"go/ast"
 	"reflect"
 	"regexp"
 	"runtime"
@@ -1079,8 +1078,9 @@ func TestGetExportedFields(t *testing.T) {
 }
 
 func TestYo(t *testing.T) {
+	t.SkipNow()
 	//parseGo(func(decl ast.Decl) {})
-	parseGoDir("/Users/oleksandr.boiko/_/MythicalGames/platform-items", func(decl ast.Decl) {})
+	//parseGoDir("/Users/oleksandr.boiko/_/MythicalGames/platform-items", func(decl ast.Decl) {})
 	//Dump2(parseTypesRecursively("/Users/oleksandr.boiko/_/MythicalGames/platform-items"))
 }
 
